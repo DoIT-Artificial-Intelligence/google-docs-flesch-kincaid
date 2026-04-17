@@ -4,144 +4,183 @@
     <base target="_top">
     <style>
       body {
-        font-family: 'Arial', sans-serif;
-        padding: 20px;
-        color: #3c4043;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        padding: 15px;
+        color: #323130;
+        background-color: #f3f2f1;
+        font-size: 14px;
       }
       .container {
         display: flex;
         flex-direction: column;
         gap: 15px;
       }
-      .stat-card {
-        background-color: #f8f9fa;
-        border: 1px solid #dadce0;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
+      .section-card {
+        background-color: #ffffff;
+        border: 1px solid #edebe9;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 12px;
         position: relative;
         overflow: hidden;
       }
       .traffic-light {
-        height: 6px;
+        height: 4px;
         width: 100%;
         position: absolute;
         top: 0;
         left: 0;
-        background-color: #dadce0;
+        background-color: transparent;
       }
-      .grade-value {
-        font-size: 32px;
-        font-weight: bold;
-        color: #1a73e8;
-        margin: 10px 0;
-      }
-      .label {
-        font-size: 14px;
-        color: #5f6368;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-      .readability-status {
+      .section-header {
         font-weight: 600;
-        font-size: 16px;
-        margin-bottom: 5px;
-      }
-      .details {
         font-size: 13px;
-        color: #70757a;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        color: #0078d4;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #f3f2f1;
+        padding-bottom: 5px;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      .value {
+        font-weight: 600;
+        color: #323130;
+      }
+      .highlight-row {
         margin-top: 10px;
+        padding-top: 10px;
+        border-top: 2px solid #f3f2f1;
+      }
+      .grade-box {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      .grade-val {
+        font-size: 28px;
+        font-weight: 700;
+        margin: 5px 0;
       }
       .btn {
-        background-color: #1a73e8;
+        background-color: #0078d4;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 4px;
+        padding: 8px 16px;
+        border-radius: 2px;
         cursor: pointer;
-        font-weight: 500;
-        margin-top: 10px;
+        font-weight: 600;
+        width: 100%;
+        margin-top: 5px;
       }
       .btn:hover {
-        background-color: #1765cc;
+        background-color: #005a9e;
       }
-      .loading {
-        font-style: italic;
-        color: #5f6368;
-        font-size: 12px;
+      .status {
+        font-size: 11px;
+        color: #605e5c;
+        text-align: center;
+        margin-top: 5px;
       }
       
       /* Traffic Light Colors */
-      .bg-great { background-color: #009900; } /* Green */
-      .bg-ok { background-color: #e6b800; }    /* Yellow/Orange */
-      .bg-hard { background-color: #cc0000; }  /* Red */
+      .bg-great { background-color: #107c10; } /* Green */
+      .bg-ok { background-color: #ffaa44; }    /* Orange/Yellow */
+      .bg-hard { background-color: #a4262c; }  /* Red */
       
-      .text-great { color: #009900; }
-      .text-ok { color: #e6b800; }
-      .text-hard { color: #cc0000; }
+      .text-great { color: #107c10; }
+      .text-ok { color: #d83b01; }
+      .text-hard { color: #a4262c; }
     </style>
   </head>
   <body>
     <div class="container">
-      <div class="stat-card">
+      <!-- Readability Section (Traffic Light) -->
+      <div class="section-card">
         <div id="color-bar" class="traffic-light"></div>
-        <div class="label">Readability</div>
-        <div id="grade" class="grade-value">--</div>
-        <div id="grade-label" class="readability-status"></div>
-        <div id="status" class="loading">Click Refresh to calculate</div>
-      </div>
-      
-      <div class="stat-card" style="text-align: left;">
-        <div class="label">Breakdown</div>
-        <div class="details">
-          <span>Words:</span> <strong id="words">0</strong>
-          <span>Sentences:</span> <strong id="sentences">0</strong>
-          <span>Syllables:</span> <strong id="syllables">0</strong>
+        <div class="section-header">Readability</div>
+        <div class="grade-box">
+          <div id="grade-val" class="grade-val">--</div>
+          <div id="grade-label" style="font-weight: 600;">Calculating...</div>
+        </div>
+        <div class="row">
+          <span>Flesch Reading Ease:</span>
+          <span id="reading-ease" class="value">0</span>
+        </div>
+        <div class="row">
+          <span>Passive Sentences:</span>
+          <span id="passive" class="value">0%</span>
         </div>
       </div>
 
-      <button class="btn" onclick="updateStats()">Refresh Stats</button>
+      <!-- Counts Section -->
+      <div class="section-card">
+        <div class="section-header">Counts</div>
+        <div class="row"><span>Words:</span> <span id="words" class="value">0</span></div>
+        <div class="row"><span>Characters:</span> <span id="chars" class="value">0</span></div>
+        <div class="row"><span>Paragraphs:</span> <span id="paras" class="value">0</span></div>
+        <div class="row"><span>Sentences:</span> <span id="sentences" class="value">0</span></div>
+      </div>
+
+      <!-- Averages Section -->
+      <div class="section-card">
+        <div class="section-header">Averages</div>
+        <div class="row"><span>Sentences per Paragraph:</span> <span id="avg-sent-para" class="value">0</span></div>
+        <div class="row"><span>Words per Sentence:</span> <span id="avg-word-sent" class="value">0</span></div>
+        <div class="row"><span>Characters per Word:</span> <span id="avg-char-word" class="value">0</span></div>
+      </div>
+
+      <button class="btn" onclick="updateStats()">Refresh Statistics</button>
+      <div id="status" class="status"></div>
     </div>
 
     <script>
       function updateStats() {
         const statusEl = document.getElementById('status');
-        statusEl.innerText = 'Calculating...';
+        statusEl.innerText = 'Analyzing...';
         
         google.script.run
           .withSuccessHandler(function(stats) {
             const grade = parseFloat(stats.gradeLevel);
-            const gradeEl = document.getElementById('grade');
+            const gradeEl = document.getElementById('grade-val');
             const labelEl = document.getElementById('grade-label');
             const barEl = document.getElementById('color-bar');
             
-            gradeEl.innerText = 'Grade ' + stats.gradeLevel;
+            gradeEl.innerText = stats.gradeLevel;
             
-            // Apply traffic light pattern
+            // Apply Word-style "Traffic Light"
             barEl.className = 'traffic-light';
-            labelEl.className = 'readability-status';
+            labelEl.className = '';
             
-            if (grade <= 9) {
+            if (grade <= 8.0) {
               barEl.classList.add('bg-great');
               labelEl.classList.add('text-great');
-              labelEl.innerText = 'Great';
-            } else if (grade <= 10) {
+              labelEl.innerText = 'Good (Grade 8.0 Target)';
+            } else if (grade <= 10.0) {
               barEl.classList.add('bg-ok');
               labelEl.classList.add('text-ok');
-              labelEl.innerText = 'OK';
+              labelEl.innerText = 'Fair (Aim lower for general readers)';
             } else {
               barEl.classList.add('bg-hard');
               labelEl.classList.add('text-hard');
-              labelEl.innerText = 'Hard to read';
+              labelEl.innerText = 'Difficult / Academic';
             }
 
+            document.getElementById('reading-ease').innerText = stats.readingEase;
+            document.getElementById('passive').innerText = stats.passivePercentage;
+            
             document.getElementById('words').innerText = stats.wordCount;
+            document.getElementById('chars').innerText = stats.charCount;
+            document.getElementById('paras').innerText = stats.paragraphCount;
             document.getElementById('sentences').innerText = stats.sentenceCount;
-            document.getElementById('syllables').innerText = stats.syllableCount;
-            statusEl.innerText = 'Updated just now';
+            
+            document.getElementById('avg-sent-para').innerText = stats.avgSentPerPara;
+            document.getElementById('avg-word-sent').innerText = stats.avgWordsPerSent;
+            document.getElementById('avg-char-word').innerText = stats.avgCharsPerWord;
+            
+            statusEl.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
           })
           .withFailureHandler(function(err) {
             statusEl.innerText = 'Error: ' + err.message;

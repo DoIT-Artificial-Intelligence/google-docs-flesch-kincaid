@@ -158,3 +158,36 @@ The add-on declares the following scopes in `src/appsscript.json`:
 
 - `https://www.googleapis.com/auth/documents.currentonly`: Grants access to read and edit the document the user is currently working on. Used to analyze the document's text.
 - `https://www.googleapis.com/auth/script.container.ui`: Allows the script to create and show the sidebar user interface within Google Docs.
+
+---
+
+## Installing & Usage
+
+The add-on is published privately to the maryland.gov domain on the Google Workspace Marketplace. In any Google Doc, open **Extensions → Add-ons → Get add-ons**, search for "Flesch-Kincaid Readability", and click **Install**. Then open **Extensions → Flesch-Kincaid Readability → Show Sidebar**, and click **Refresh Statistics** after editing.
+
+---
+
+## Privacy
+
+The add-on requests access only to the document you have open and permission to show a sidebar (see the scopes above). It reads the document text only when you open the sidebar or click Refresh. The text is analyzed within Google Apps Script and is not stored, logged, or sent to any third party.
+
+---
+
+## Support
+
+Report problems or request features via [GitHub Issues](https://github.com/DoIT-Artificial-Intelligence/google-docs-flesch-kincaid/issues).
+
+---
+
+## Releasing to the Marketplace
+
+The Marketplace listing lives in GCP project `adept-figure-493916-r5` (Marketplace SDK). To release an update:
+
+```bash
+clasp push
+clasp create-version "description"
+```
+
+Then set the new **Script version** in Marketplace SDK → App Configuration → Docs add-on.
+
+Store listing text and images are in `store-assets/` (regenerate images with `uv run store-assets/make_assets.py`).

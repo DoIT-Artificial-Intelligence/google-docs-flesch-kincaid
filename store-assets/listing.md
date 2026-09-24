@@ -31,7 +31,7 @@
 - Application icon 128×128: `icon-128.png`
 - Application icon 32×32: `icon-32.png`
 - Application card banner 220×140: `banner-220x140.png`
-- Screenshot 1280×800: take a real screenshot of the sidebar open in a Doc
+- Screenshot 1280×800: `screenshot-1280x800.png`
 
 **Support links:**
 

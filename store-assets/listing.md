@@ -6,7 +6,7 @@
 
 **Short description** (max 200 chars):
 
-> See your document's Flesch-Kincaid grade level, reading ease, and passive voice in a sidebar — the same readability statistics as Microsoft Word, right in Google Docs.
+> See your document's Flesch-Kincaid grade level, reading ease, and passive voice in a sidebar. Word-style readability statistics, right in Google Docs.
 
 **Detailed description:**
 

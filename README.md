@@ -1,8 +1,8 @@
 # Google Docs Flesch-Kincaid Readability Calculator
 
-A Google Docs Add-on designed to calculate and display readability metrics (Flesch-Kincaid Grade Level and Flesch Reading Ease) along with advanced text statistics directly in a document sidebar. 
+A Google Docs add-on that shows your readability grade and Hemingway-style plain language suggestions in a sidebar, highlights issues in the document, and fixes them in one click.
 
-![Google Docs Flesch-Kincaid Screenshot](./Screenshot%202026-04-17%20170955.png)
+![Flesch-Kincaid Readability sidebar with highlights in a Google Doc](./store-assets/screenshot-1280x800.png)
 
 ---
 
@@ -181,6 +181,11 @@ clasp push
 clasp create-version "description"
 ```
 
-Then set the new **Script version** in Marketplace SDK → App Configuration → Docs add-on.
+Then:
 
-Store listing text and images are in `store-assets/` (regenerate images with `uv run store-assets/make_assets.py`).
+1. In Marketplace SDK → **App Configuration**, set **Docs add-on script version** to the new version and click **Save Draft**.
+2. Open the **Store Listing** tab and click **Publish**. Saving only creates a draft; users keep the old version until you publish.
+
+Test changes first with Apps Script → **Deploy → Test deployments**, which runs the latest pushed code (HEAD) in a test document.
+
+Store listing text and images are in `store-assets/`. The icons and banner come from `uv run store-assets/make_assets.py`. `screenshot-1280x800.png` is a browser screenshot of the sidebar at a 1280×800 viewport.

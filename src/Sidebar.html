@@ -373,9 +373,9 @@
           var idx = result.issues.indexOf(issue);
           var body;
           if (issue.before !== undefined) {
-            body = (issue.before ? '…' + esc(issue.before) : '') +
+            body = (issue.cutBefore ? '…' : '') + esc(issue.before) +
               '<mark style="background:var(--' + c.type + ')">' + esc(issue.text) + '</mark>' +
-              (issue.after ? esc(issue.after) + '…' : '');
+              esc(issue.after) + (issue.cutAfter ? '…' : '');
           } else {
             var t = issue.text.length > 140 ? issue.text.slice(0, 140) + '…' : issue.text;
             body = '<mark style="background:var(--' + c.type + ')">' + esc(t) + '</mark>';

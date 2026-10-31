@@ -504,8 +504,10 @@ function analyzeParagraphs(paragraphs) {
       const o = Object.assign({ type, p: para.id, start: base + start, end: base + end, text: text.slice(start, end) }, extra || {});
       if (type !== 'hard' && type !== 'veryHard' && type !== 'longParagraph') {
         // Trim to whole words when the snippet is cut mid-paragraph.
-        o.before = start > 30 ? text.slice(start - 30, start).replace(/^\S*\s/, '') : text.slice(0, start);
-        o.after = end + 30 < text.length ? text.slice(end, end + 30).replace(/\s\S*$/, '') : text.slice(end);
+        o.cutBefore = start > 30;
+        o.cutAfter = end + 30 < text.length;
+        o.before = o.cutBefore ? text.slice(start - 30, start).replace(/^\S*\s/, '') : text.slice(0, start);
+        o.after = o.cutAfter ? text.slice(end, end + 30).replace(/\s\S*$/, '') : text.slice(end);
       }
       issues.push(o);
       counts[type]++;

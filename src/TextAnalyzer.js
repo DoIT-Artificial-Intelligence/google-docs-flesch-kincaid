@@ -250,7 +250,12 @@ function buildSimplerWords() {
     pursuant: 'under', reflect: 'show', relative: 'about', remain: 'stay',
     selection: 'choice', solely: 'only', successfully: '', sustain: 'keep',
     therefore: 'so', thus: 'so', ultimately: 'finally', unavailability: 'lack',
-    visualize: 'see', whether: 'if'
+    visualize: 'see', whether: 'if', shall: ['must', 'will'],
+    // Maryland Plain Language Standards: talk to the reader.
+    'the applicant': 'you', 'the applicants': 'you', 'the claimant': 'you',
+    'the recipient': 'you', 'the customer': 'you', 'the participant': 'you',
+    'the beneficiary': 'you', 'the requester': 'you', 'the resident': 'you',
+    "the applicant's": 'your', "the customer's": 'your'
   };
   Object.keys(nouns).forEach(k => { if (!map[k]) add(k, nouns[k]); });
   // "whether" and "reflect" are too noisy to flag on their own.
@@ -401,6 +406,49 @@ const PASSIVE_RE = new RegExp(
   "\\b(?:" + BE_VERBS + ")\\b(?:\\s+(?:not|never|also|often|always|still|already|being|been|[a-z]+ly))*\\s+" +
   "([a-z]+ed|" + IRREGULAR_PARTICIPLES.join('|') + ")\\b", 'gi');
 
+/** Acronyms readers already know, which do not need to be spelled out. */
+const COMMON_ACRONYMS = new Set([
+  'US', 'USA', 'UK', 'EU', 'UN', 'OK', 'TV', 'AM', 'PM', 'ID', 'IDS', 'FAQ', 'FAQS', 'PDF', 'URL', 'AI',
+  'IT', 'CEO', 'DC', 'NASA', 'FBI', 'CIA', 'IRS', 'DNA', 'HIV', 'AIDS', 'COVID', 'ATM', 'PIN', 'GPS',
+  'ASAP', 'RSVP', 'USB', 'HTML', 'PC', 'MD', 'NY', 'CA', 'TX', 'VA', 'PA', 'DE', 'WV', 'ZIP', 'SSN',
+  'LLC', 'INC', 'FYI', 'ET', 'EST', 'EDT', 'APP', 'APPS', 'Q', 'A', 'I', 'II', 'III', 'IV', 'VI'
+]);
+const ACRONYM_RE = /\b[A-Z][A-Z0-9&]*[A-Z][A-Z0-9&]*s?\b/g;
+
+/**
+ * Finds acronyms whose first use comes before any definition such as
+ * "Motor Vehicle Administration (MVA)" or "MVA (Motor Vehicle Administration)".
+ * Returns a map from paragraph id to [{start, end, text}] of first uses to flag.
+ */
+function undefinedAcronyms(paragraphs) {
+  const first = {};
+  const defined = {};
+  paragraphs.forEach((para, order) => {
+    const text = para.text || '';
+    if (!/[a-z]/.test(text)) return; // all-caps headings
+    ACRONYM_RE.lastIndex = 0;
+    let m;
+    while ((m = ACRONYM_RE.exec(text)) !== null) {
+      const word = m[0].replace(/s$/, '');
+      if (word.length < 2 || COMMON_ACRONYMS.has(word) || /^[IVXLCDM]+$/.test(word) || /^\d/.test(word)) continue;
+      const pos = order * 1e7 + m.index;
+      const before = text.slice(Math.max(0, m.index - 1), m.index);
+      const after = text.slice(m.index + m[0].length, m.index + m[0].length + 2);
+      if ((before === '(' && /^\)/.test(after)) || /^\s\(/.test(after)) {
+        if (defined[word] === undefined) defined[word] = pos;
+      }
+      if (first[word] === undefined) first[word] = { pos, p: para.id, start: m.index, end: m.index + m[0].length, text: m[0] };
+    }
+  });
+  const out = {};
+  Object.keys(first).forEach(word => {
+    const f = first[word];
+    if (defined[word] !== undefined && defined[word] <= f.pos) return;
+    (out[f.p] = out[f.p] || []).push(f);
+  });
+  return out;
+}
+
 function phraseRegex(phrases) {
   const sorted = phrases.slice().sort((a, b) => b.length - a.length)
     .map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "['\u2019]").replace(/ /g, '\\s+'));
@@ -472,18 +520,36 @@ function computeScores(t) {
 // Main analysis
 // ---------------------------------------------------------------------------
 
-const ISSUE_TYPES = ['veryHard', 'hard', 'simpler', 'wordy', 'adverb', 'passive', 'qualifier', 'longParagraph', 'repeated'];
+const ISSUE_TYPES = ['veryHard', 'hard', 'simpler', 'wordy', 'adverb', 'passive', 'qualifier', 'acronym',
+  'list', 'longParagraph', 'repeated'];
+
+/** Sentence-level issues, where the whole sentence is the issue text. */
+const SENTENCE_TYPES = new Set(['hard', 'veryHard', 'longParagraph', 'list']);
+
+/** Stable identity for "Ignore": the type plus the normalized text. */
+function issueKey(type, text) {
+  return type + '|' + text.toLowerCase().replace(/\s+/g, ' ').trim();
+}
 
 /**
  * Analyzes a list of paragraphs.
  *
  * @param {Array<{id:number, text:string, offset?:number, heading?:boolean}>} paragraphs
  *   `offset` shifts all reported positions (used when analyzing a selection).
- * @return {Object} totals, scores, and issues. Each issue has
- *   {type, p, start, end, text, suggestions?, grade?} with positions relative
- *   to the full paragraph text.
+ * @param {{ignored?: string[], acronyms?: boolean}} [options] `ignored` lists
+ *   issue keys to skip; `acronyms` turns on the undefined-acronym check
+ *   (only meaningful for a whole document).
+ * @return {Object} totals, scores, issues, and per-heading sections. Each issue
+ *   has {type, key, p, start, end, text, suggestions?, grade?} with positions
+ *   relative to the full paragraph text.
  */
-function analyzeParagraphs(paragraphs) {
+function analyzeParagraphs(paragraphs, options) {
+  options = options || {};
+  const ignored = new Set(options.ignored || []);
+  let ignoredCount = 0;
+  const acronyms = options.acronyms ? undefinedAcronyms(paragraphs) : {};
+  const sections = [];
+  let section = null;
   const totals = {
     words: 0, sentences: 0, paragraphs: 0, characters: 0, charactersNoSpaces: 0,
     letters: 0, syllables: 0, polysyllables: 0, complexWords: 0
@@ -501,8 +567,10 @@ function analyzeParagraphs(paragraphs) {
     totals.characters += text.length;
     totals.charactersNoSpaces += text.replace(/\s/g, '').length;
     const issue = (type, start, end, extra) => {
-      const o = Object.assign({ type, p: para.id, start: base + start, end: base + end, text: text.slice(start, end) }, extra || {});
-      if (type !== 'hard' && type !== 'veryHard' && type !== 'longParagraph') {
+      const key = issueKey(type, text.slice(start, end));
+      if (ignored.has(key)) { ignoredCount++; return null; }
+      const o = Object.assign({ type, key, p: para.id, start: base + start, end: base + end, text: text.slice(start, end) }, extra || {});
+      if (!SENTENCE_TYPES.has(type)) {
         // Trim to whole words when the snippet is cut mid-paragraph.
         o.cutBefore = start > 30;
         o.cutAfter = end + 30 < text.length;
@@ -517,6 +585,10 @@ function analyzeParagraphs(paragraphs) {
     const sentences = splitSentences(text);
     // Heading styles are sometimes used for body text; only short headings are exempt.
     const isHeading = !!para.heading && sentences.length <= 1;
+    if (isHeading || !section) {
+      section = { title: isHeading ? text.trim() : '', p: para.id, words: 0, sentences: 0, syllables: 0, letters: 0 };
+      sections.push(section);
+    }
     let paraWords = 0;
     sentences.forEach(s => {
       const sText = text.slice(s.start, s.end);
@@ -540,6 +612,12 @@ function analyzeParagraphs(paragraphs) {
       totals.words += words.length;
       totals.letters += letters;
       paraWords += words.length;
+      if (!isHeading) {
+        section.words += words.length;
+        section.sentences++;
+        section.letters += letters;
+        section.syllables += words.reduce((n, w) => n + countSyllables(w.word), 0);
+      }
 
       // Hemingway-style hard sentences: 14+ words and a sentence-level ARI of 10+ (14+ is very hard).
       const grade = Math.round(ariGrade(letters, words.length, 1));
@@ -556,9 +634,16 @@ function analyzeParagraphs(paragraphs) {
         const participle = m[1].toLowerCase();
         if (NOT_PARTICIPLES.has(participle) || (participle.length <= 4 && /eed$/.test(participle))) continue;
         passiveHere = true;
-        issue('passive', s.start + m.index, s.start + m.index + m[0].length);
+        issue('passive', s.start + m.index, s.start + m.index + m[0].length,
+          { sentence: { start: base + s.start, end: base + s.end, text: sText } });
       }
       if (passiveHere) passiveSentences++;
+
+      // Long inline lists are easier to scan as bullets.
+      const commas = (sText.match(/,/g) || []).length;
+      if (!isHeading && commas >= 3 && words.length >= 25 && /,\s+(?:and|or)\s/i.test(sText)) {
+        issue('list', s.start, s.end, { words: words.length });
+      }
     });
 
     // Word- and phrase-level checks run over the whole paragraph.
@@ -573,6 +658,11 @@ function analyzeParagraphs(paragraphs) {
         if (cb(m, a, b) !== false) taken.push([a, b]);
       }
     };
+    // Repeated words first: they are usually typos and may sit inside a longer phrase.
+    scan(/\b([A-Za-z']+)(\s+)\1\b/gi, (m, a, b) => {
+      if (/^(?:that|had|is|do|bye|ha|no|very|really)$/i.test(m[1])) return false;
+      issue('repeated', a, b, { suggestions: [m[1]] });
+    });
     scan(WORDY_RE, (m, a, b) => {
       const key = m[0].toLowerCase().replace(/\s+/g, ' ').replace(/\u2019/g, "'");
       issue('wordy', a, b, { suggestions: [matchCase(m[0], WORDY_PHRASES[key])] });
@@ -591,10 +681,7 @@ function analyzeParagraphs(paragraphs) {
       if (NOT_ADVERBS.has(w) || /^[A-Z]/.test(m[0]) && a > 0 && !/[.!?]\s*$/.test(text.slice(0, a))) return false;
       issue('adverb', a, b);
     });
-    scan(/\b([A-Za-z']+)(\s+)\1\b/gi, (m, a, b) => {
-      if (/^(?:that|had|is|do|bye|ha|no|very|really)$/i.test(m[1])) return false;
-      issue('repeated', a, b, { suggestions: [m[1]] });
-    });
+    (acronyms[para.id] || []).forEach(f => issue('acronym', f.start, f.end));
 
     if (!isHeading && (sentences.length > 5 || paraWords > 150)) {
       issue('longParagraph', 0, Math.min(text.length, sentences.length ? sentences[0].end : text.length),
@@ -616,12 +703,19 @@ function analyzeParagraphs(paragraphs) {
   const typeOrder = {};
   ISSUE_TYPES.forEach((t, i) => { typeOrder[t] = i; });
   issues.sort((a, b) => a.p - b.p || a.start - b.start || typeOrder[a.type] - typeOrder[b.type]);
-  return { stats, scores, counts, issues };
+
+  // Section grades are only useful when the document has headings.
+  const withText = sections.filter(x => x.words > 0);
+  const outSections = sections.some(x => x.title) ? withText.map(x => {
+    const sc = computeScores(Object.assign({ polysyllables: 0, complexWords: 0 }, x));
+    return { title: x.title, p: x.p, words: x.words, fleschKincaid: sc.fleschKincaid, ari: sc.ari, readingEase: sc.readingEase };
+  }) : [];
+  return { stats, scores, counts, issues, sections: outSections, ignoredCount };
 }
 
 if (typeof module !== 'undefined') {
   module.exports = {
     analyzeParagraphs, splitSentences, tokenizeWords, countSyllables, computeScores,
-    ariGrade, SIMPLER_WORDS, WORDY_PHRASES, ISSUE_TYPES, verbForms, matchCase
+    ariGrade, SIMPLER_WORDS, WORDY_PHRASES, ISSUE_TYPES, verbForms, matchCase, issueKey, undefinedAcronyms
   };
 }

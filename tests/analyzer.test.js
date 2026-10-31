@@ -107,3 +107,47 @@ test('empty input returns zeros', () => {
   assert.strictEqual(r.scores.fleschKincaid, 0);
   assert.strictEqual(r.issues.length, 0);
 });
+
+test('flags acronyms used before they are defined', () => {
+  const paras = [
+    { id: 0, text: 'Contact MVA or MDH today. The IRS and the FBI are federal.' },
+    { id: 1, text: 'The Maryland Department of Health (MDH) can help. The MVA (Motor Vehicle Administration) too.' },
+    { id: 2, text: 'The Department of Labor (DOL) said DOL forms are online.' }
+  ];
+  const r = a.analyzeParagraphs(paras, { acronyms: true });
+  assert.deepStrictEqual(ofType(r, 'acronym').sort(), ['MDH', 'MVA']);
+  assert.strictEqual(a.analyzeParagraphs(paras).counts.acronym, 0); // off unless asked
+});
+
+test('suggests must for shall and you for the applicant', () => {
+  const r = analyzeText('The applicant shall sign the form.');
+  const s = r.issues.filter(i => i.type === 'simpler').map(i => [i.text, i.suggestions[0]]);
+  assert.deepStrictEqual(s, [['The applicant', 'You'], ['shall', 'must']]);
+});
+
+test('flags long inline lists', () => {
+  const r = analyzeText('You can apply by mail, by email, by phone at the main office, through the online portal, or in person at any regional office during business hours.');
+  assert.strictEqual(r.counts.list, 1);
+});
+
+test('ignored issues are skipped and counted', () => {
+  const text = 'We will utilize it. They utilize it too.';
+  const first = analyzeText(text);
+  const key = first.issues.find(i => i.type === 'simpler').key;
+  const r = a.analyzeParagraphs([{ id: 0, text }], { ignored: [key] });
+  assert.strictEqual(r.counts.simpler, 0);
+  assert.strictEqual(r.ignoredCount, 2);
+});
+
+test('reports a grade for each heading section', () => {
+  const r = a.analyzeParagraphs([
+    { id: 0, text: 'Intro text is short.' },
+    { id: 1, text: 'Eligibility', heading: true },
+    { id: 2, text: 'Notwithstanding the aforementioned considerations, applicants must demonstrate comprehensive documentation.' },
+    { id: 3, text: 'How to apply', heading: true },
+    { id: 4, text: 'Fill out the form. Send it to us.' }
+  ]);
+  assert.deepStrictEqual(r.sections.map(x => x.title), ['', 'Eligibility', 'How to apply']);
+  assert.ok(r.sections[1].fleschKincaid > r.sections[2].fleschKincaid);
+  assert.strictEqual(analyzeText('No headings here.').sections.length, 0);
+});

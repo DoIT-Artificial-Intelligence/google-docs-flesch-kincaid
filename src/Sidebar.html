@@ -21,7 +21,10 @@
         --qualifier: #c5e2fa;
         --passive: #cbedc9;
         --repeated: #fbd5b3;
+        --acronym: #f9d0e6;
+        --list: #e3e3e3;
         --longParagraph: #e3e3e3;
+        --ai: #6c3fc5;
       }
       * { box-sizing: border-box; }
       body {
@@ -110,6 +113,30 @@
       .notice { background: #fff8e1; border: 1px solid #f9e1a0; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin-bottom: 10px; }
       .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
       .empty { color: var(--good); font-weight: 600; padding: 6px 0; }
+      .item-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 5px; }
+      .item-actions .fixes { margin-top: 0; }
+      .ai-btn { border: 1px solid #cdb8f5; background: #f4effd; color: var(--ai); border-radius: 12px; padding: 1px 9px; cursor: pointer; font-size: 12px; font-weight: 600; }
+      .ai-btn:hover { background: #e9defb; }
+      .ai-btn[disabled] { opacity: .6; cursor: progress; }
+      .link-btn { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 11px; padding: 2px 4px; margin-left: auto; text-decoration: underline; }
+      .link-btn:hover { color: var(--text); }
+      .ai-box { border: 1px solid #cdb8f5; background: #faf7ff; border-radius: 6px; padding: 7px 8px; margin-top: 6px; font-size: 12px; }
+      .ai-box .ai-text { white-space: pre-wrap; }
+      .ai-box .ai-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+      .ai-box ul { margin: 3px 0 0 16px; padding: 0; color: var(--ok); }
+      .ai-ok { color: var(--good); font-weight: 600; }
+      .ai-warn { color: var(--ok); font-weight: 600; }
+      .ai-box .fixes { margin-top: 6px; }
+      .accept { background: var(--accent); color: #fff; border-color: var(--accent); }
+      .accept:hover { background: #0842a0; }
+      .ignored { font-size: 11px; color: var(--muted); padding-top: 6px; }
+      .section-row { display: flex; width: 100%; gap: 8px; align-items: center; border: 0; background: none; padding: 5px 0; cursor: pointer; text-align: left; border-top: 1px solid var(--line); }
+      .section-row:first-child { border-top: 0; }
+      .section-row span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .section-row:hover span:first-child { text-decoration: underline; }
+      .badge { font-size: 11px; font-weight: 700; border-radius: 10px; padding: 1px 7px; white-space: nowrap; }
+      .badge.good { background: #e6f4ea; } .badge.ok { background: #fef7e0; } .badge.bad { background: #fce8e6; }
+      .footer-actions { display: flex; gap: 8px; align-items: center; }
     </style>
   </head>
   <body>
@@ -122,6 +149,11 @@
     </div>
 
     <div id="notice" class="notice" hidden></div>
+
+    <section class="card" id="selection-card" hidden aria-label="Rewrite selection">
+      <button type="button" class="ai-btn" id="rewrite-selection">✨ Rewrite selection in plain language</button>
+      <div id="selection-ai"></div>
+    </section>
 
     <section class="card" aria-labelledby="readability-h">
       <h2 id="readability-h">Readability</h2>
@@ -156,8 +188,14 @@
         <label class="switch"><input type="checkbox" id="highlight"> Highlight in doc</label>
       </div>
       <div id="categories"></div>
+      <div id="ignored" class="ignored" hidden></div>
       <p class="note" id="highlight-note" hidden>Highlights are added to the document as background colors. Turn this off or use Extensions → Flesch-Kincaid Readability → Clear Highlights before sharing.</p>
     </section>
+
+    <details class="card" id="sections-card" open hidden>
+      <summary>Grade by section</summary>
+      <div id="sections"></div>
+    </details>
 
     <details class="card" id="scores-card">
       <summary>All readability scores</summary>
@@ -171,7 +209,10 @@
 
     <div class="footer">
       <label class="switch"><input type="checkbox" id="auto-refresh"> Update as I type</label>
-      <span id="updated"></span>
+      <span class="footer-actions">
+        <button type="button" class="link-btn" id="copy-summary" title="Copy scores and suggestions to paste into an email or review">Copy summary</button>
+        <span id="updated"></span>
+      </span>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
 
@@ -194,18 +235,25 @@
           help: 'Adverbs often prop up weak verbs. Use a stronger verb or delete the adverb.' },
         { type: 'qualifier', name: 'qualifier', label: function (n) { return n + ' qualifier' + (n === 1 ? '' : 's'); },
           help: 'Hedges like "very", "just", and "I think" weaken your point. Delete them.' },
+        { type: 'acronym', name: 'undefined acronym', label: function (n) { return n + ' acronym' + (n === 1 ? '' : 's') + ' not spelled out'; },
+          help: 'Spell out an acronym the first time you use it, like "Motor Vehicle Administration (MVA)." Then use the acronym.' },
+        { type: 'list', name: 'inline list', label: function (n) { return n + ' long list' + (n === 1 ? '' : 's') + ' in a sentence'; },
+          help: 'Long lists inside a sentence are hard to follow. Turn them into a bulleted list.', noHighlight: true },
         { type: 'repeated', name: 'repeated word', label: function (n) { return n + ' repeated word' + (n === 1 ? '' : 's'); },
           help: 'The same word twice in a row is usually a typo.' },
         { type: 'longParagraph', name: 'long paragraph', label: function (n) { return n + ' long paragraph' + (n === 1 ? '' : 's'); },
           help: 'Paragraphs with more than 5 sentences or 150 words are hard to scan. Break them up.', noHighlight: true }
       ];
       var PAGE = 25;
+      /** Issue types that can be rewritten with AI (the whole sentence is sent). */
+      var AI_TYPES = { veryHard: 1, hard: 1, passive: 1, list: 1 };
 
       var result = null;
       var expanded = {};
       var shown = {};
       var busy = false;
       var timer = null;
+      var ai = {};  // AI rewrite state by key: {ref, status: 'loading'|'done'|'error', data, error}
 
       function $(id) { return document.getElementById(id); }
       function esc(s) {
@@ -265,15 +313,98 @@
       }
 
       function applyFix(issue, replacement) {
+        replaceRef(issueRef(issue), replacement,
+          replacement ? 'Replaced with "' + replacement + '".' : 'Deleted "' + issue.text + '".');
+      }
+
+      function replaceRef(ref, replacement, doneMessage) {
         setStatus('Replacing…');
         busy = true;
         google.script.run
-          .withSuccessHandler(function () {
-            busy = false;
-            analyze(true, replacement ? 'Replaced with "' + replacement + '".' : 'Deleted "' + issue.text + '".');
-          })
+          .withSuccessHandler(function () { busy = false; analyze(true, doneMessage); })
           .withFailureHandler(function (err) { busy = false; setStatus(err.message, true); })
-          .replaceIssue(issueRef(issue), replacement);
+          .replaceIssue(ref, replacement);
+      }
+
+      function aiKey(issue) { return issue.key + '@' + issue.p + ':' + issue.start; }
+
+      function aiRef(issue) {
+        if (issue.type === 'passive' && issue.sentence) {
+          return { path: result.paths[issue.p], start: issue.sentence.start, end: issue.sentence.end, text: issue.sentence.text };
+        }
+        return issueRef(issue);
+      }
+
+      function startRewrite(key, ref) {
+        ai[key] = { ref: ref, status: 'loading' };
+        redrawAi(key);
+        setStatus('Rewriting with AI…');
+        google.script.run
+          .withSuccessHandler(function (data) {
+            ai[key] = { ref: data.ref, status: 'done', data: data };
+            redrawAi(key);
+            setStatus(data.sameMeaning ? 'Rewrite ready.' : 'Rewrite ready. Check the meaning before you accept it.');
+          })
+          .withFailureHandler(function (err) {
+            ai[key] = { ref: ref, status: 'error', error: err.message };
+            redrawAi(key);
+            setStatus(err.message, true);
+          })
+          .aiRewrite(ref, settings.targetGrade);
+      }
+
+      function redrawAi(key) {
+        if (key === 'selection') { $('selection-ai').innerHTML = aiBox('selection'); return; }
+        renderCategories();
+      }
+
+      function aiBox(key) {
+        var st = ai[key];
+        if (!st) return '';
+        var k = esc(key);
+        if (st.status === 'loading') return '<div class="ai-box" aria-busy="true">✨ Rewriting… this takes a few seconds.</div>';
+        if (st.status === 'error') {
+          return '<div class="ai-box">' + esc(st.error) +
+            '<div class="fixes"><button type="button" class="fix" data-ai-retry="' + k + '">Try again</button>' +
+            '<button type="button" class="fix" data-ai-dismiss="' + k + '">Dismiss</button></div></div>';
+        }
+        var d = st.data;
+        var target = Number(settings.targetGrade);
+        var gradeCls = Math.round(d.grade) <= target ? 'good' : Math.round(d.grade) <= target + 2 ? 'ok' : 'bad';
+        var meaning = d.sameMeaning
+          ? '<span class="ai-ok">✓ Meaning kept</span>'
+          : '<span class="ai-warn">⚠ Check the meaning:</span><ul>' +
+            d.changes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>';
+        return '<div class="ai-box"><div class="ai-text">' + esc(d.rewrite) + '</div>' +
+          '<div class="ai-meta"><span class="badge ' + gradeCls + '">Grade ' + Math.max(0, Math.round(d.grade)) + '</span> ' + meaning + '</div>' +
+          '<div class="fixes"><button type="button" class="fix accept" data-ai-accept="' + k + '">Accept</button>' +
+          '<button type="button" class="fix" data-ai-retry="' + k + '">Try again</button>' +
+          '<button type="button" class="fix" data-ai-dismiss="' + k + '">Dismiss</button></div></div>';
+      }
+
+      function handleAiButton(btn) {
+        var key = btn.dataset.aiAccept || btn.dataset.aiRetry || btn.dataset.aiDismiss;
+        var st = ai[key];
+        if (!st) return false;
+        if (btn.dataset.aiAccept) {
+          delete ai[key];
+          redrawAi(key);
+          replaceRef(st.ref, st.data.rewrite, 'Rewrite applied.');
+        } else if (btn.dataset.aiRetry) {
+          startRewrite(key, key === 'selection' ? null : st.ref);
+        } else {
+          delete ai[key];
+          redrawAi(key);
+        }
+        return true;
+      }
+
+      function ignore(issue) {
+        busy = true;
+        google.script.run
+          .withSuccessHandler(function () { busy = false; analyze(true, 'Ignored "' + issue.text.slice(0, 40) + '" in this document.'); })
+          .withFailureHandler(function (err) { busy = false; setStatus(err.message, true); })
+          .ignoreIssue(issue.key);
       }
 
       // ---- Rendering ----------------------------------------------------
@@ -314,9 +445,31 @@
         $('q-words').textContent = s.words.toLocaleString();
         $('q-time').textContent = readingTime(s.readingTimeMinutes);
 
+        $('selection-card').hidden = result.scope !== 'selection' && settings.scope !== 'selection';
         renderCategories();
+        renderIgnored();
+        renderSections();
         renderScores();
         renderStats();
+      }
+
+      function renderIgnored() {
+        var n = result.ignoredCount || 0;
+        $('ignored').hidden = !n;
+        $('ignored').innerHTML = n ? n + ' ignored in this document · <button type="button" class="link-btn" id="reset-ignored" style="margin:0">Show again</button>' : '';
+      }
+
+      function renderSections() {
+        var list = result.sections || [];
+        $('sections-card').hidden = list.length < 2;
+        var target = Number(settings.targetGrade);
+        $('sections').innerHTML = list.map(function (sec, i) {
+          var g = Math.max(0, Math.round(settings.primaryScore === 'ari' ? sec.ari : sec.fleschKincaid));
+          var cls = g <= target ? 'good' : g <= target + 2 ? 'ok' : 'bad';
+          return '<button type="button" class="section-row" data-section="' + i + '" title="' + (sec.title ? 'Go to this heading' : 'Text before the first heading') + '">' +
+            '<span>' + esc(sec.title || 'Before the first heading') + '</span>' +
+            '<span class="badge ' + cls + '">Grade ' + g + '</span></button>';
+        }).join('');
       }
 
       function readingTime(min) {
@@ -386,14 +539,23 @@
           html += '<div class="item"><button type="button" class="item-text" data-jump="' + idx + '" title="Select in document">' + body + '</button>';
           if (meta) html += '<div class="item-meta">' + esc(meta) + '</div>';
           var fixes = issue.suggestions || ((c.type === 'adverb') ? [''] : []);
+          var key = aiKey(issue);
+          html += '<div class="item-actions">';
           if (fixes.length) {
-            html += '<div class="fixes">';
+            html += '<span class="fixes">';
             fixes.slice(0, 3).forEach(function (f, fi) {
               html += '<button type="button" class="fix" data-fix="' + idx + '" data-fi="' + fi + '">' +
                 (f ? esc(f) : 'Delete') + '</button>';
             });
-            html += '</div>';
+            html += '</span>';
           }
+          if (AI_TYPES[c.type]) {
+            var loading = ai[key] && ai[key].status === 'loading';
+            html += '<button type="button" class="ai-btn" data-ai="' + idx + '"' + (loading ? ' disabled' : '') +
+              ' title="Rewrite this sentence in plain language with AI">✨ Rewrite</button>';
+          }
+          html += '<button type="button" class="link-btn" data-ignore="' + idx + '" title="Stop flagging this in this document">Ignore</button></div>';
+          html += aiBox(key);
           html += '</div>';
         });
         if (items.length > limit) {
@@ -456,6 +618,7 @@
         settings.scope = scope;
         $('scope-document').setAttribute('aria-pressed', scope === 'document');
         $('scope-selection').setAttribute('aria-pressed', scope === 'selection');
+        $('selection-card').hidden = scope !== 'selection';
       }
 
       $('scope-document').onclick = function () { setScope('document'); save(); analyze(); };
@@ -484,7 +647,13 @@
       $('categories').addEventListener('click', function (e) {
         var btn = e.target.closest('button');
         if (!btn || !result) return;
-        if (btn.dataset.cat) {
+        if (handleAiButton(btn)) return;
+        if (btn.dataset.ai) {
+          var aiIssue = result.issues[Number(btn.dataset.ai)];
+          startRewrite(aiKey(aiIssue), aiRef(aiIssue));
+        } else if (btn.dataset.ignore) {
+          ignore(result.issues[Number(btn.dataset.ignore)]);
+        } else if (btn.dataset.cat) {
           expanded[btn.dataset.cat] = !expanded[btn.dataset.cat];
           renderCategories();
           var again = document.querySelector('[data-cat="' + btn.dataset.cat + '"]');
@@ -508,6 +677,64 @@
           renderCategories();
         }
       });
+
+      $('rewrite-selection').onclick = function () { startRewrite('selection', null); };
+      $('selection-ai').addEventListener('click', function (e) {
+        var btn = e.target.closest('button');
+        if (btn) handleAiButton(btn);
+      });
+
+      $('ignored').addEventListener('click', function (e) {
+        if (!e.target.closest('#reset-ignored')) return;
+        busy = true;
+        google.script.run
+          .withSuccessHandler(function () { busy = false; analyze(true, 'Ignored suggestions are back.'); })
+          .withFailureHandler(function (err) { busy = false; setStatus(err.message, true); })
+          .resetIgnored();
+      });
+
+      $('sections').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-section]');
+        if (!btn || !result) return;
+        var sec = result.sections[Number(btn.dataset.section)];
+        if (!sec.title) return;
+        var path = result.paths[sec.p];
+        google.script.run
+          .withSuccessHandler(function () { setStatus('Selected heading in document.'); })
+          .withFailureHandler(function (err) { setStatus(err.message, true); })
+          .selectIssue({ path: path, start: 0, end: sec.title.length, text: sec.title });
+      });
+
+      $('copy-summary').onclick = function () {
+        if (!result) return;
+        var s = result.stats, sc = result.scores;
+        var lines = [
+          'Readability summary' + (result.scope === 'selection' ? ' (selection)' : ''),
+          'Flesch-Kincaid grade: ' + fmt(sc.fleschKincaid, 1) + ' (target ' + settings.targetGrade + ')',
+          'Hemingway-style grade (ARI): ' + fmt(sc.ari, 1),
+          'Reading ease: ' + fmt(sc.readingEase, 1) + ' (' + easeLabel(sc.readingEase) + ')',
+          'Words: ' + s.words + ', sentences: ' + s.sentences + ', reading time: ' + readingTime(s.readingTimeMinutes),
+          '',
+          'Suggestions:'
+        ];
+        CATEGORIES.forEach(function (c) {
+          var n = result.counts[c.type] || 0;
+          if (n) lines.push('- ' + c.label(n, s.sentences));
+        });
+        if (lines[lines.length - 1] === 'Suggestions:') lines.push('- None');
+        (result.sections || []).forEach(function (sec, i) {
+          if (i === 0) lines.push('', 'Grade by section:');
+          lines.push('- ' + (sec.title || 'Before the first heading') + ': ' + Math.max(0, Math.round(sec.fleschKincaid)));
+        });
+        var ta = document.createElement('textarea');
+        ta.value = lines.join('\n');
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+        document.body.removeChild(ta);
+        setStatus(ok ? 'Summary copied. Paste it into an email or comment.' : 'Could not copy. Your browser blocked it.', !ok);
+      };
 
       // ---- Init ---------------------------------------------------------
 

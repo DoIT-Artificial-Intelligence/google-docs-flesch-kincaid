@@ -13,7 +13,8 @@ const HIGHLIGHT_COLORS = {
   adverb: '#c5e2fa',
   qualifier: '#c5e2fa',
   passive: '#cbedc9',
-  repeated: '#fbd5b3'
+  repeated: '#fbd5b3',
+  acronym: '#f9d0e6'
 };
 const OUR_COLORS = new Set(Object.values(HIGHLIGHT_COLORS));
 /** Each highlight is a few document calls, so very long documents are capped. */
@@ -242,7 +243,8 @@ function analyzeDocument(options) {
     records = collectParagraphs(body).map((r, i) => ({ id: i, path: r.path, heading: r.heading, text: r.text, offset: 0 }));
   }
 
-  const result = analyzeParagraphs(records);
+  const ignored = getIgnored();
+  const result = analyzeParagraphs(records, { ignored, acronyms: scope === 'document' });
   result.paths = records.map(r => r.path);
   result.scope = scope;
   result.notice = notice;
@@ -288,7 +290,7 @@ function applyHighlights(body, result, hidden) {
   const hiddenSet = new Set(hidden);
   const records = {};
   // Sentences first so word-level colors sit on top of them.
-  const order = ['veryHard', 'hard', 'passive', 'adverb', 'qualifier', 'simpler', 'wordy', 'repeated'];
+  const order = ['veryHard', 'hard', 'passive', 'adverb', 'qualifier', 'simpler', 'wordy', 'acronym', 'repeated'];
   const issues = result.issues.filter(i => HIGHLIGHT_COLORS[i.type] && !hiddenSet.has(i.type)).slice(0, MAX_HIGHLIGHTS);
   order.forEach(type => {
     issues.filter(i => i.type === type).forEach(issue => {
@@ -411,4 +413,150 @@ function replaceIssue(issue, replacement) {
     }
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Ignoring issues (per document)
+// ---------------------------------------------------------------------------
+
+function getIgnored() {
+  const saved = PropertiesService.getDocumentProperties().getProperty('ignored');
+  return saved ? JSON.parse(saved) : [];
+}
+
+/** Ignores every issue with this key (type + text) in the current document. */
+function ignoreIssue(key) {
+  const list = getIgnored();
+  if (list.indexOf(key) === -1) list.push(key);
+  // Document properties hold up to 9 KB per value; keep the newest keys.
+  while (JSON.stringify(list).length > 8500) list.shift();
+  PropertiesService.getDocumentProperties().setProperty('ignored', JSON.stringify(list));
+}
+
+function resetIgnored() {
+  PropertiesService.getDocumentProperties().deleteProperty('ignored');
+}
+
+// ---------------------------------------------------------------------------
+// AI rewrites (Gemini)
+// ---------------------------------------------------------------------------
+
+const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const AI_DAILY_LIMIT = 300;
+
+/**
+ * Rewrites text in plain language with Gemini, re-scores the result, retries
+ * once if it is still hard, and checks that the meaning did not change.
+ *
+ * @param {{path:string, start:number, end:number, text:string}|null} ref the
+ *   text to rewrite, or null to use the current selection.
+ * @param {number} targetGrade reading grade to aim for.
+ * @return {{ref:Object, rewrite:string, grade:number, sameMeaning:boolean, changes:string[]}}
+ */
+function aiRewrite(ref, targetGrade) {
+  if (!ref) ref = selectionRef();
+  const target = Math.max(4, Math.min(14, Number(targetGrade) || 8));
+  countAiUse();
+
+  let rewrite = geminiJson(rewritePrompt(ref.text, target, ''), {
+    type: 'OBJECT', properties: { rewrite: { type: 'STRING' } }, required: ['rewrite']
+  }).rewrite.trim();
+  let check = scoreText(rewrite);
+  if (check.hard || check.grade > target + 1) {
+    const feedback = 'Your last attempt was still at grade ' + Math.round(check.grade) +
+      '. Use shorter sentences and simpler words.\nLast attempt: ' + rewrite;
+    rewrite = geminiJson(rewritePrompt(ref.text, target, feedback), {
+      type: 'OBJECT', properties: { rewrite: { type: 'STRING' } }, required: ['rewrite']
+    }).rewrite.trim();
+    check = scoreText(rewrite);
+  }
+
+  const meaning = geminiJson(
+    'Compare the ORIGINAL text and its plain language REWRITE.\n' +
+    'List every fact, number, name, date, condition, or requirement that the rewrite adds, removes, or changes. ' +
+    'Also list it if a requirement became optional or a request (for example "must" became "please"). ' +
+    'Ignore changes in wording, tone, or sentence structure that keep the meaning. ' +
+    'Set sameMeaning to true only if the list is empty. Keep each item under 15 words.\n\n' +
+    'ORIGINAL: ' + ref.text + '\n\nREWRITE: ' + rewrite,
+    {
+      type: 'OBJECT',
+      properties: { sameMeaning: { type: 'BOOLEAN' }, changes: { type: 'ARRAY', items: { type: 'STRING' } } },
+      required: ['sameMeaning', 'changes']
+    });
+
+  return {
+    ref,
+    rewrite,
+    grade: check.grade,
+    sameMeaning: !!meaning.sameMeaning && !(meaning.changes || []).length,
+    changes: meaning.changes || []
+  };
+}
+
+function rewritePrompt(text, target, feedback) {
+  return 'You are a plain language editor for the State of Maryland.\n' +
+    'Rewrite the TEXT so a reader at US grade ' + target + ' or below can understand it.\n' +
+    'Rules:\n' +
+    '- Keep every fact, number, name, date, deadline, condition, and requirement.\n' +
+    '- Keep obligations as obligations: "must" stays "must". Never turn a requirement into a request.\n' +
+    '- Do not add information, examples, or reasons that are not in the text.\n' +
+    '- Use short sentences (under 20 words), common words, and active voice.\n' +
+    '- Speak to the reader as "you" when the text is about the reader.\n' +
+    '- Keep the same language, and keep any names or terms that must stay exact.\n' +
+    '- Return only the rewritten text, with no quotes or notes.\n' +
+    (feedback ? '\n' + feedback + '\n' : '') +
+    '\nTEXT: ' + text;
+}
+
+/** Grade (Flesch-Kincaid) and whether any sentence is still hard. */
+function scoreText(text) {
+  const r = analyzeParagraphs([{ id: 0, text }]);
+  return { grade: r.scores.fleschKincaid, hard: r.counts.hard + r.counts.veryHard > 0 };
+}
+
+function geminiJson(prompt, schema) {
+  const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) throw new Error('AI rewrites are not set up yet. Ask your administrator to add GEMINI_API_KEY.');
+  const response = UrlFetchApp.fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'x-goog-api-key': key },
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.2 }
+      })
+    });
+  if (response.getResponseCode() !== 200) {
+    console.error('Gemini error ' + response.getResponseCode() + ': ' + response.getContentText().slice(0, 500));
+    throw new Error('The AI service is busy or unavailable. Try again in a minute.');
+  }
+  const body = JSON.parse(response.getContentText());
+  const part = body.candidates && body.candidates[0] && body.candidates[0].content &&
+    body.candidates[0].content.parts && body.candidates[0].content.parts[0];
+  if (!part) throw new Error('The AI service did not return a rewrite. Try again.');
+  return JSON.parse(part.text);
+}
+
+/** Per-user daily limit so one person cannot use up the shared quota. */
+function countAiUse() {
+  const props = PropertiesService.getUserProperties();
+  const today = Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd');
+  const saved = JSON.parse(props.getProperty('aiUse') || '{}');
+  const used = saved.day === today ? saved.n : 0;
+  if (used >= AI_DAILY_LIMIT) throw new Error('You have reached today\'s limit of ' + AI_DAILY_LIMIT + ' AI rewrites.');
+  props.setProperty('aiUse', JSON.stringify({ day: today, n: used + 1 }));
+}
+
+/** The selected text as an issue-style reference. It must sit in one paragraph. */
+function selectionRef() {
+  const windows = selectedWindows(DocumentApp.getActiveDocument());
+  if (!windows) throw new Error('Select the text you want to rewrite first.');
+  if (windows.length > 1) throw new Error('Select text within one paragraph to rewrite it.');
+  const w = windows[0];
+  const text = w.record.text.slice(w.start, w.end);
+  if (!text.trim()) throw new Error('Select the text you want to rewrite first.');
+  if (text.length > 2000) throw new Error('Select a shorter passage (under 2,000 characters) to rewrite.');
+  return { path: w.record.path, start: w.start, end: w.end, text };
 }

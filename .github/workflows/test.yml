@@ -1,0 +1,18 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Apps Script syntax
+        run: node --check src/Code.js && node --check src/TextAnalyzer.js
+      - name: Run analyzer tests
+        run: node --test tests/analyzer.test.js

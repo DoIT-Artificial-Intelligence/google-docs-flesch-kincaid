@@ -17,6 +17,14 @@ Everything the Hemingway Editor checks, inside Google Docs, plus more:
   - Words with simpler alternatives (purple), from the federal plain language word list
   - Adverbs, passive voice, and qualifiers like "very", "just", and "I think"
 - **Extra plain language checks Hemingway does not do:** wordy phrases ("in order to" → "to", "due to the fact that" → "because"), repeated words ("the the"), and long paragraphs.
+- **Maryland Plain Language Standards checks:** acronyms used before they are spelled out, "shall" → "must", "the applicant" → "you", and long lists inside a sentence that should be bullets.
+- **AI rewrites (Gemini 3.5 Flash-Lite):** click **✨ Rewrite** on a hard sentence, a passive sentence, or a long list, or select any text and choose **Rewrite selection**. Each rewrite is:
+  - re-scored, and retried once if it is still above your target grade
+  - checked by a second AI pass that lists any fact, number, date, or requirement that was added, dropped, or changed
+  - only applied when you click **Accept**
+- **Ignore:** dismiss a suggestion you disagree with. Ignored items are remembered for that document and can be brought back.
+- **Grade by section:** a grade for each heading, so you can see which part of a long document needs work. Click a section to jump to it.
+- **Copy summary:** copy the scores and suggestion counts to paste into an email or review comment.
 - **Works in the document:**
   - **Highlight in doc** colors issues right in the Google Doc. Each category can be shown or hidden. Highlights only use the add-on's own colors, so your highlights stay. Clear them from the sidebar or **Extensions → Flesch-Kincaid Readability → Clear Highlights**.
   - Click any suggestion to select that text in the document.
@@ -47,7 +55,9 @@ The project is a Google Apps Script editor add-on. Text analysis is pure JavaScr
 - **`src/Code.js`**: menus and sidebar. It reads paragraphs (including tables and lists), analyzes the document or the selection, writes and clears highlights, selects issues, and applies fixes. Paragraphs are identified by their path of child indexes. Fixes check that the text is still there before changing it.
 - **`src/Sidebar.html`**: the sidebar UI. It calls the server with `google.script.run`. When "Update as I type" is on, it compares a cheap document fingerprint every 4 seconds and re-analyzes only when the text or selection changes.
 
-Settings (target grade, formula, highlight and auto-update choices) are saved per user with `PropertiesService`.
+Settings (target grade, formula, highlight and auto-update choices) are saved per user with `PropertiesService`. Ignored suggestions are saved per document.
+
+AI rewrites call the Gemini API from `aiRewrite()` in `Code.js` with `UrlFetchApp`. The API key is read from the **`GEMINI_API_KEY` script property** (Apps Script → Project Settings → Script properties). It is never sent to the sidebar or stored in the repo. Each user gets up to 300 rewrites a day. The model name is the `GEMINI_MODEL` constant.
 
 ---
 
@@ -151,6 +161,7 @@ The add-on declares the following scopes in `src/appsscript.json`:
 
 - `https://www.googleapis.com/auth/documents.currentonly`: Grants access to read and edit the document the user is currently working on. Used to analyze the text, and to add highlights or apply fixes when you ask.
 - `https://www.googleapis.com/auth/script.container.ui`: Allows the script to create and show the sidebar user interface within Google Docs.
+- `https://www.googleapis.com/auth/script.external_request`: Lets the add-on call the Gemini API for AI rewrites. Requests can only go to `generativelanguage.googleapis.com` (see `urlFetchWhitelist` in the manifest).
 
 ---
 
@@ -183,7 +194,7 @@ clasp create-version "description"
 
 Then:
 
-1. In Marketplace SDK → **App Configuration**, set **Docs add-on script version** to the new version and click **Save Draft**.
+1. In Marketplace SDK → **App Configuration**, set **Docs add-on script version** to the new version. If the manifest's `oauthScopes` changed, add the same scopes to the OAuth Scopes list. Click **Save Draft**.
 2. Open the **Store Listing** tab and click **Publish**. Saving only creates a draft; users keep the old version until you publish.
 
 Test changes first with Apps Script → **Deploy → Test deployments**, which runs the latest pushed code (HEAD) in a test document.

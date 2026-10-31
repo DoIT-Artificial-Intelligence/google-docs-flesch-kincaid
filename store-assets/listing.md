@@ -6,7 +6,7 @@
 
 **Short description** (max 200 chars):
 
-> Make your writing clear. See your grade level, highlight hard sentences, passive voice, and complex words in your doc, and fix them in one click.
+> Make your writing clear. See your grade level, highlight hard sentences, passive voice, and complex words, and fix them in one click or with AI rewrites.
 
 **Detailed description:**
 
@@ -17,13 +17,18 @@
 > - Your reading grade level against a target you choose, with Flesch-Kincaid, reading ease, Gunning Fog, SMOG, Coleman-Liau, and Automated Readability Index scores
 > - Hard and very hard sentences
 > - Words with simpler alternatives, wordy phrases, adverbs, passive voice, qualifiers, repeated words, and long paragraphs
+> - A grade for each section of your document
 > - Words, sentences, paragraphs, averages, and reading time
 >
 > Turn on "Highlight in doc" to color each issue in your document. Click a suggestion to jump to it. Click a fix to replace a word or delete a weak phrase. Select text and choose "Selection" to check one part. The sidebar updates as you type.
 >
+> Click "Rewrite" on a hard sentence, or select any text, to get a plain language rewrite from AI. Each rewrite shows its grade and a meaning check that flags changed facts, dates, or requirements. Nothing changes until you click Accept.
+>
+> It also checks Maryland Plain Language Standards: acronyms that are not spelled out, "shall" instead of "must", "the applicant" instead of "you", and long lists that should be bullets.
+>
 > Plain language makes public information easier for everyone to understand. Aim for grade 8 or lower for general audiences.
 >
-> Privacy: the add-on only reads the document you have open, and only while the sidebar is open. It changes your document only when you turn on highlights or click a fix. Text is analyzed in Apps Script and is not stored or sent anywhere else.
+> Privacy: the add-on only reads the document you have open, and only while the sidebar is open. It changes your document only when you turn on highlights, click a fix, or accept a rewrite. Scores and suggestions are worked out in Apps Script. When you click Rewrite, only that sentence or selection is sent to Google's Gemini API (paid tier, not used to train models). The add-on does not store your text.
 
 **Graphics:**
 

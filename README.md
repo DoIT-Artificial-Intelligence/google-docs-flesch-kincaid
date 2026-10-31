@@ -173,7 +173,12 @@ The add-on is published privately to the maryland.gov domain on the Google Works
 
 ## Privacy
 
-The add-on requests access only to the document you have open and permission to show a sidebar (see the scopes above). It reads the document text only while the sidebar is open. It changes the document only when you turn on highlights or click a fix. The text is analyzed within Google Apps Script and is not stored, logged, or sent to any third party. Your sidebar settings are saved to your Google account.
+The add-on can only open the document you have open (see the scopes above).
+
+- **Reading:** it reads the document text only while the sidebar is open. Readability scores and suggestions are worked out inside Google Apps Script.
+- **Changes:** it changes your document only when you turn on highlights, click a fix, or accept an AI rewrite.
+- **AI rewrites:** when you click **✨ Rewrite** or **Rewrite selection**, the add-on sends only that sentence or selection to Google's Gemini API to write a plain language version and check its meaning. Nothing is sent unless you click. The add-on uses the paid Gemini API, and Google does not use paid API data to train its models.
+- **Storage:** the add-on does not store or log your document text. Your sidebar settings and daily rewrite count are saved to your Google account. Suggestions you ignore are saved with the document.
 
 ---
 

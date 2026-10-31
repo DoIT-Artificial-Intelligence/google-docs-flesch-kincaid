@@ -6,7 +6,7 @@
 
 **Short description** (max 200 chars):
 
-> See your document's Flesch-Kincaid grade level, reading ease, and passive voice in a sidebar. Word-style readability statistics, right in Google Docs.
+> Make your writing clear. See your grade level, highlight hard sentences, passive voice, and complex words in your doc, and fix them in one click.
 
 **Detailed description:**
 
@@ -14,17 +14,16 @@
 >
 > Open Extensions → Flesch-Kincaid Readability → Show Sidebar to see:
 >
-> - Flesch-Kincaid Grade Level, with a traffic-light rating (green at grade 8 or below)
-> - Flesch Reading Ease score
-> - Percentage of passive sentences
-> - Counts: words, characters, paragraphs, sentences
-> - Averages: sentences per paragraph, words per sentence, characters per word
+> - Your reading grade level against a target you choose, with Flesch-Kincaid, reading ease, Gunning Fog, SMOG, Coleman-Liau, and Automated Readability Index scores
+> - Hard and very hard sentences
+> - Words with simpler alternatives, wordy phrases, adverbs, passive voice, qualifiers, repeated words, and long paragraphs
+> - Words, sentences, paragraphs, averages, and reading time
 >
-> Click "Refresh Statistics" after editing to update the scores.
+> Turn on "Highlight in doc" to color each issue in your document. Click a suggestion to jump to it. Click a fix to replace a word or delete a weak phrase. Select text and choose "Selection" to check one part. The sidebar updates as you type.
 >
 > Plain language makes public information easier for everyone to understand. Aim for grade 8 or lower for general audiences.
 >
-> Privacy: the add-on only reads the document you have open, and only when you use it. Text is analyzed in Apps Script and is not stored or sent anywhere else.
+> Privacy: the add-on only reads the document you have open, and only while the sidebar is open. It changes your document only when you turn on highlights or click a fix. Text is analyzed in Apps Script and is not stored or sent anywhere else.
 
 **Graphics:**
 

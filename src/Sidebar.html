@@ -1,194 +1,533 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <base target="_top">
     <style>
+      :root {
+        --text: #1f1f1f;
+        --muted: #5e5e5e;
+        --line: #e3e3e3;
+        --surface: #ffffff;
+        --bg: #f8f9fa;
+        --accent: #0b57d0;
+        --good: #146c2e;
+        --ok: #8a5300;
+        --bad: #b3261e;
+        --veryHard: #f6c4c3;
+        --hard: #fbecb4;
+        --simpler: #e3cff8;
+        --wordy: #e3cff8;
+        --adverb: #c5e2fa;
+        --qualifier: #c5e2fa;
+        --passive: #cbedc9;
+        --repeated: #fbd5b3;
+        --longParagraph: #e3e3e3;
+      }
+      * { box-sizing: border-box; }
       body {
-        font-family: 'Segoe UI', Arial, sans-serif;
-        padding: 15px;
-        color: #323130;
-        background-color: #f3f2f1;
-        font-size: 14px;
-      }
-      .container {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-      }
-      .section-card {
-        background-color: #ffffff;
-        border: 1px solid #edebe9;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        font-family: 'Google Sans', Roboto, Arial, sans-serif;
+        margin: 0;
         padding: 12px;
-        position: relative;
-        overflow: hidden;
-      }
-      .traffic-light {
-        height: 4px;
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        background-color: transparent;
-      }
-      .section-header {
-        font-weight: 600;
+        color: var(--text);
+        background: var(--bg);
         font-size: 13px;
-        color: #0078d4;
-        text-transform: uppercase;
-        margin-bottom: 10px;
-        border-bottom: 1px solid #f3f2f1;
-        padding-bottom: 5px;
+        line-height: 1.4;
       }
-      .row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 6px;
+      button { font: inherit; color: inherit; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+      .segmented { display: flex; flex: 1; border: 1px solid #c4c7c5; border-radius: 16px; overflow: hidden; }
+      .segmented button {
+        flex: 1; border: 0; background: transparent; padding: 5px 4px; cursor: pointer; font-size: 12px;
       }
-      .value {
-        font-weight: 600;
-        color: #323130;
+      .segmented button[aria-pressed="true"] { background: #d3e3fd; font-weight: 600; }
+      .icon-btn {
+        border: 1px solid #c4c7c5; background: var(--surface); border-radius: 16px; padding: 4px 10px;
+        cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent);
       }
-      .highlight-row {
-        margin-top: 10px;
-        padding-top: 10px;
-        border-top: 2px solid #f3f2f1;
+      .icon-btn:hover { background: #f0f4f9; }
+      .card {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+        padding: 12px; margin-bottom: 10px;
       }
-      .grade-box {
-        text-align: center;
-        margin-bottom: 10px;
+      .card h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
+      .grade-line { display: flex; align-items: baseline; gap: 8px; }
+      .grade { font-size: 30px; font-weight: 700; line-height: 1.1; }
+      .verdict { font-weight: 600; font-size: 14px; }
+      .good { color: var(--good); } .ok { color: var(--ok); } .bad { color: var(--bad); }
+      .meter { height: 6px; background: #eceff1; border-radius: 3px; margin: 8px 0 6px; position: relative; overflow: hidden; }
+      .meter span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+      .sub { color: var(--muted); font-size: 12px; }
+      .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+      .controls label { display: flex; flex-direction: column; gap: 2px; }
+      select { font: inherit; font-size: 12px; color: var(--text); padding: 3px 2px; border: 1px solid #c4c7c5; border-radius: 4px; background: var(--surface); width: 100%; }
+      .clean { color: var(--muted); font-size: 12px; padding: 6px 2px 2px; border-top: 1px solid var(--line); }
+      .clean b { color: var(--good); }
+      .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; text-align: center; }
+      .quick div { background: var(--bg); border-radius: 6px; padding: 6px 2px; }
+      .quick b { display: block; font-size: 15px; }
+      .quick small { color: var(--muted); font-size: 11px; }
+
+      .issues-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+      .issues-head h2 { margin: 0; }
+      .switch { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+      .cat { border-top: 1px solid var(--line); }
+      .cat:first-of-type { border-top: 0; }
+      .cat-row { display: flex; align-items: center; gap: 4px; }
+      .cat-toggle {
+        flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; border: 0; background: none;
+        padding: 7px 2px; cursor: pointer;
       }
-      .grade-val {
-        font-size: 28px;
-        font-weight: 700;
-        margin: 5px 0;
-      }
-      .btn {
-        background-color: #0078d4;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 2px;
-        cursor: pointer;
-        font-weight: 600;
-        width: 100%;
-        margin-top: 5px;
-      }
-      .btn:hover {
-        background-color: #005a9e;
-      }
-      .status {
-        font-size: 11px;
-        color: #605e5c;
-        text-align: center;
-        margin-top: 5px;
-      }
-      
-      /* Traffic Light Colors */
-      .bg-great { background-color: #107c10; } /* Green */
-      .bg-ok { background-color: #ffaa44; }    /* Orange/Yellow */
-      .bg-hard { background-color: #a4262c; }  /* Red */
-      
-      .text-great { color: #107c10; }
-      .text-ok { color: #d83b01; }
-      .text-hard { color: #a4262c; }
+      .cat-toggle[disabled] { cursor: default; color: var(--muted); }
+      .swatch { width: 26px; min-width: 26px; height: 20px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+      .chev { margin-left: auto; color: var(--muted); transition: transform .15s; }
+      .cat-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+      .eye { border: 0; background: none; cursor: pointer; padding: 4px; color: var(--muted); border-radius: 4px; }
+      .eye:hover { background: var(--bg); }
+      .eye[aria-pressed="false"] { opacity: .45; }
+      .panel { padding: 0 0 8px 34px; }
+      .help { color: var(--muted); font-size: 12px; margin: 0 0 6px; }
+      .item { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
+      .item-text { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 0; cursor: pointer; font-size: 12px; }
+      .item-text:hover mark { text-decoration: underline; }
+      .item-text mark { border-radius: 2px; padding: 0 1px; color: inherit; }
+      .item-meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+      .fixes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+      .fix { border: 1px solid #a8c7fa; background: #ecf3fe; color: #0842a0; border-radius: 12px; padding: 1px 9px; cursor: pointer; font-size: 12px; }
+      .fix:hover { background: #d3e3fd; }
+      .more { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 2px 0; font-size: 12px; }
+      .note { font-size: 11px; color: var(--muted); margin: 6px 0 0; }
+
+      details.card { padding: 0; }
+      details.card > summary { padding: 10px 12px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+      details.card > div { padding: 0 12px 10px; }
+      .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+      .row span:first-child { color: var(--muted); }
+      .row b { font-weight: 600; }
+      .footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+      .status { font-size: 11px; color: var(--muted); min-height: 16px; margin-top: 6px; }
+      .status.error { color: var(--bad); }
+      .notice { background: #fff8e1; border: 1px solid #f9e1a0; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin-bottom: 10px; }
+      .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      .empty { color: var(--good); font-weight: 600; padding: 6px 0; }
     </style>
   </head>
   <body>
-    <div class="container">
-      <!-- Readability Section (Traffic Light) -->
-      <div class="section-card">
-        <div id="color-bar" class="traffic-light"></div>
-        <div class="section-header">Readability</div>
-        <div class="grade-box">
-          <div id="grade-val" class="grade-val">--</div>
-          <div id="grade-label" style="font-weight: 600;">Calculating...</div>
-        </div>
-        <div class="row">
-          <span>Flesch Reading Ease:</span>
-          <span id="reading-ease" class="value">0</span>
-        </div>
-        <div class="row">
-          <span>Passive Sentences:</span>
-          <span id="passive" class="value">0%</span>
-        </div>
+    <div class="toolbar">
+      <div class="segmented" role="group" aria-label="What to analyze">
+        <button type="button" id="scope-document" aria-pressed="true">Document</button>
+        <button type="button" id="scope-selection" aria-pressed="false">Selection</button>
       </div>
-
-      <!-- Counts Section -->
-      <div class="section-card">
-        <div class="section-header">Counts</div>
-        <div class="row"><span>Words:</span> <span id="words" class="value">0</span></div>
-        <div class="row"><span>Characters:</span> <span id="chars" class="value">0</span></div>
-        <div class="row"><span>Paragraphs:</span> <span id="paras" class="value">0</span></div>
-        <div class="row"><span>Sentences:</span> <span id="sentences" class="value">0</span></div>
-      </div>
-
-      <!-- Averages Section -->
-      <div class="section-card">
-        <div class="section-header">Averages</div>
-        <div class="row"><span>Sentences per Paragraph:</span> <span id="avg-sent-para" class="value">0</span></div>
-        <div class="row"><span>Words per Sentence:</span> <span id="avg-word-sent" class="value">0</span></div>
-        <div class="row"><span>Characters per Word:</span> <span id="avg-char-word" class="value">0</span></div>
-      </div>
-
-      <button class="btn" onclick="updateStats()">Refresh Statistics</button>
-      <div id="status" class="status"></div>
+      <button type="button" class="icon-btn" id="refresh" title="Re-analyze now">Refresh</button>
     </div>
 
-    <script>
-      function updateStats() {
-        const statusEl = document.getElementById('status');
-        statusEl.innerText = 'Analyzing...';
-        
-        google.script.run
-          .withSuccessHandler(function(stats) {
-            const grade = parseFloat(stats.gradeLevel);
-            const gradeEl = document.getElementById('grade-val');
-            const labelEl = document.getElementById('grade-label');
-            const barEl = document.getElementById('color-bar');
-            
-            gradeEl.innerText = stats.gradeLevel;
-            
-            // Apply Word-style "Traffic Light"
-            barEl.className = 'traffic-light';
-            labelEl.className = '';
-            
-            if (grade <= 8.0) {
-              barEl.classList.add('bg-great');
-              labelEl.classList.add('text-great');
-              labelEl.innerText = 'Good (Grade 8.0 Target)';
-            } else if (grade <= 10.0) {
-              barEl.classList.add('bg-ok');
-              labelEl.classList.add('text-ok');
-              labelEl.innerText = 'Fair (Aim lower for general readers)';
-            } else {
-              barEl.classList.add('bg-hard');
-              labelEl.classList.add('text-hard');
-              labelEl.innerText = 'Difficult / Academic';
-            }
+    <div id="notice" class="notice" hidden></div>
 
-            document.getElementById('reading-ease').innerText = stats.readingEase;
-            document.getElementById('passive').innerText = stats.passivePercentage;
-            
-            document.getElementById('words').innerText = stats.wordCount;
-            document.getElementById('chars').innerText = stats.charCount;
-            document.getElementById('paras').innerText = stats.paragraphCount;
-            document.getElementById('sentences').innerText = stats.sentenceCount;
-            
-            document.getElementById('avg-sent-para').innerText = stats.avgSentPerPara;
-            document.getElementById('avg-word-sent').innerText = stats.avgWordsPerSent;
-            document.getElementById('avg-char-word').innerText = stats.avgCharsPerWord;
-            
-            statusEl.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
+    <section class="card" aria-labelledby="readability-h">
+      <h2 id="readability-h">Readability</h2>
+      <div class="grade-line">
+        <span class="grade" id="grade">--</span>
+        <span class="verdict" id="verdict">Analyzing…</span>
+      </div>
+      <div class="meter" aria-hidden="true"><span id="meter-fill"></span></div>
+      <div class="sub" id="grade-advice"></div>
+      <div class="controls">
+        <label>Grade formula
+          <select id="primary-score">
+            <option value="fleschKincaid">Flesch-Kincaid</option>
+            <option value="ari">Hemingway (ARI)</option>
+            <option value="consensus">Average of 5</option>
+          </select>
+        </label>
+        <label>Target
+          <select id="target-grade"></select>
+        </label>
+      </div>
+      <div class="quick">
+        <div><b id="q-ease">--</b><small>Reading ease</small></div>
+        <div><b id="q-words">--</b><small>Words</small></div>
+        <div><b id="q-time">--</b><small>Reading time</small></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="issues-h">
+      <div class="issues-head">
+        <h2 id="issues-h">Suggestions</h2>
+        <label class="switch"><input type="checkbox" id="highlight"> Highlight in doc</label>
+      </div>
+      <div id="categories"></div>
+      <p class="note" id="highlight-note" hidden>Highlights are added to the document as background colors. Turn this off or use Extensions → Flesch-Kincaid Readability → Clear Highlights before sharing.</p>
+    </section>
+
+    <details class="card" id="scores-card">
+      <summary>All readability scores</summary>
+      <div id="scores"></div>
+    </details>
+
+    <details class="card" id="stats-card">
+      <summary>Statistics</summary>
+      <div id="stats"></div>
+    </details>
+
+    <div class="footer">
+      <label class="switch"><input type="checkbox" id="auto-refresh"> Update as I type</label>
+      <span id="updated"></span>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <script>
+      var settings = <?!= settingsJson ?>;
+      settings.hidden = settings.hidden || [];
+
+      var CATEGORIES = [
+        { type: 'veryHard', name: 'very hard sentence', label: function (n, s) { return n + ' of ' + s + ' sentence' + (s === 1 ? ' is' : 's are') + ' very hard to read'; },
+          help: 'Very long or dense sentences. Split them up or cut extra words.' },
+        { type: 'hard', name: 'hard sentence', label: function (n, s) { return n + ' of ' + s + ' sentence' + (s === 1 ? ' is' : 's are') + ' hard to read'; },
+          help: 'Long or complex sentences. Shorten them or split them in two.' },
+        { type: 'simpler', name: 'simpler word', label: function (n) { return n + (n === 1 ? ' word has' : ' words have') + ' a simpler alternative'; },
+          help: 'Plain words are easier to read. Click a suggestion to replace the word.' },
+        { type: 'wordy', name: 'wordy phrase', label: function (n) { return n + ' wordy phrase' + (n === 1 ? '' : 's'); },
+          help: 'Say the same thing in fewer words.' },
+        { type: 'passive', name: 'passive voice', label: function (n, s) { return n + ' use' + (n === 1 ? '' : 's') + ' of passive voice'; },
+          help: 'Passive voice hides who acts. Name the actor: "We reviewed the form," not "The form was reviewed."' },
+        { type: 'adverb', name: 'adverb', label: function (n) { return n + ' adverb' + (n === 1 ? '' : 's'); },
+          help: 'Adverbs often prop up weak verbs. Use a stronger verb or delete the adverb.' },
+        { type: 'qualifier', name: 'qualifier', label: function (n) { return n + ' qualifier' + (n === 1 ? '' : 's'); },
+          help: 'Hedges like "very", "just", and "I think" weaken your point. Delete them.' },
+        { type: 'repeated', name: 'repeated word', label: function (n) { return n + ' repeated word' + (n === 1 ? '' : 's'); },
+          help: 'The same word twice in a row is usually a typo.' },
+        { type: 'longParagraph', name: 'long paragraph', label: function (n) { return n + ' long paragraph' + (n === 1 ? '' : 's'); },
+          help: 'Paragraphs with more than 5 sentences or 150 words are hard to scan. Break them up.', noHighlight: true }
+      ];
+      var PAGE = 25;
+
+      var result = null;
+      var expanded = {};
+      var shown = {};
+      var busy = false;
+      var timer = null;
+
+      function $(id) { return document.getElementById(id); }
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+      function fmt(n, d) { return (Math.round(n * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toFixed(d || 0); }
+      function setStatus(msg, isError) {
+        var el = $('status');
+        el.textContent = msg || '';
+        el.className = 'status' + (isError ? ' error' : '');
+      }
+      function save() { google.script.run.saveSettings(settings); }
+      function isHidden(type) { return settings.hidden.indexOf(type) !== -1; }
+
+      // ---- Server calls -------------------------------------------------
+
+      function analyze(quiet, doneMessage) {
+        if (busy) return;
+        busy = true;
+        if (!quiet) setStatus('Analyzing…');
+        google.script.run
+          .withSuccessHandler(function (r) {
+            busy = false;
+            result = r;
+            render();
+            if (doneMessage) setStatus(doneMessage);
+            else if (!quiet) setStatus(r.highlighted ? 'Highlights updated.' : '');
+            $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
           })
-          .withFailureHandler(function(err) {
-            statusEl.innerText = 'Error: ' + err.message;
+          .withFailureHandler(function (err) {
+            busy = false;
+            setStatus('Error: ' + err.message, true);
           })
-          .calculateStats();
+          .analyzeDocument({ scope: settings.scope || 'document', highlight: settings.highlight, hidden: settings.hidden });
       }
 
-      window.onload = updateStats;
+      function poll() {
+        if (!settings.autoRefresh || busy || document.hidden || !result) return;
+        google.script.run
+          .withSuccessHandler(function (fp) {
+            if (result && fp !== result.fingerprint) analyze(true);
+          })
+          .getFingerprint(settings.scope || 'document');
+      }
+
+      function issueRef(issue) {
+        return { path: result.paths[issue.p], start: issue.start, end: issue.end, text: issue.text };
+      }
+
+      function jumpTo(issue) {
+        google.script.run
+          .withSuccessHandler(function () { setStatus('Selected in document.'); })
+          .withFailureHandler(function (err) { setStatus(err.message, true); })
+          .selectIssue(issueRef(issue));
+      }
+
+      function applyFix(issue, replacement) {
+        setStatus('Replacing…');
+        busy = true;
+        google.script.run
+          .withSuccessHandler(function () {
+            busy = false;
+            analyze(true, replacement ? 'Replaced with "' + replacement + '".' : 'Deleted "' + issue.text + '".');
+          })
+          .withFailureHandler(function (err) { busy = false; setStatus(err.message, true); })
+          .replaceIssue(issueRef(issue), replacement);
+      }
+
+      // ---- Rendering ----------------------------------------------------
+
+      function primaryValue() {
+        return result.scores[settings.primaryScore] !== undefined ? result.scores[settings.primaryScore] : result.scores.fleschKincaid;
+      }
+
+      function render() {
+        var s = result.stats, sc = result.scores;
+        $('notice').hidden = !result.notice;
+        $('notice').textContent = result.notice || '';
+
+        if (!s.words) {
+          $('grade').textContent = '--';
+          $('verdict').textContent = 'No text to analyze';
+          $('verdict').className = 'verdict';
+          $('grade-advice').textContent = result.scope === 'selection' ? 'Select some sentences, then click Refresh.' : 'Start writing, then click Refresh.';
+          $('meter-fill').style.width = '0';
+        } else {
+          var g = Math.max(0, primaryValue());
+          var shownGrade = Math.round(g);
+          var target = Number(settings.targetGrade);
+          var cls = shownGrade <= target ? 'good' : shownGrade <= target + 2 ? 'ok' : 'bad';
+          $('grade').textContent = 'Grade ' + shownGrade;
+          $('grade').className = 'grade ' + cls;
+          $('verdict').textContent = cls === 'good' ? 'Good' : cls === 'ok' ? 'OK' : 'Hard to read';
+          $('verdict').className = 'verdict ' + cls;
+          $('grade-advice').textContent = cls === 'good'
+            ? 'At or below your target of grade ' + target + '.'
+            : 'Aim for grade ' + target + ' or lower. Fix the hard sentences first.';
+          var fill = $('meter-fill');
+          fill.style.width = Math.min(100, (g / 18) * 100) + '%';
+          fill.style.background = cls === 'good' ? 'var(--good)' : cls === 'ok' ? '#e3a008' : 'var(--bad)';
+        }
+
+        $('q-ease').textContent = s.words ? fmt(Math.max(0, Math.min(100, sc.readingEase))) : '--';
+        $('q-words').textContent = s.words.toLocaleString();
+        $('q-time').textContent = readingTime(s.readingTimeMinutes);
+
+        renderCategories();
+        renderScores();
+        renderStats();
+      }
+
+      function readingTime(min) {
+        if (!min) return '0 min';
+        if (min < 1) return Math.max(1, Math.round(min * 60)) + ' sec';
+        return Math.round(min) + ' min';
+      }
+
+      function renderCategories() {
+        var s = result.stats;
+        var html = '';
+        var total = 0;
+        var clean = [];
+        CATEGORIES.forEach(function (c) {
+          var n = result.counts[c.type] || 0;
+          total += n;
+          if (!n) { clean.push(c.name + (c.type === 'passive' ? '' : 's')); return; }
+          var open = expanded[c.type] && n > 0;
+          var color = 'var(--' + c.type + ')';
+          html += '<div class="cat">' +
+            '<div class="cat-row">' +
+            '<button type="button" class="cat-toggle" data-cat="' + c.type + '" aria-expanded="' + open + '"' + (n ? '' : ' disabled') + '>' +
+            '<span class="swatch" style="background:' + color + '">' + n + '</span>' +
+            '<span>' + esc(c.label(n, s.sentences)) + '</span>' +
+            (n ? '<span class="chev" aria-hidden="true">›</span>' : '') +
+            '</button>' +
+            (c.noHighlight ? '' :
+              '<button type="button" class="eye" data-eye="' + c.type + '" aria-pressed="' + !isHidden(c.type) + '" ' +
+              'title="' + (isHidden(c.type) ? 'Show' : 'Hide') + ' these highlights in the document" ' +
+              'aria-label="Highlight ' + esc(c.name) + ' issues in document">' + eyeIcon() + '</button>') +
+            '</div>';
+          if (open) html += renderPanel(c);
+          html += '</div>';
+        });
+        if (!total && s.words) html = '<div class="empty">No suggestions. Nice work.</div>';
+        else if (clean.length && s.words) html += '<div class="clean"><b>✓</b> No ' + esc(listJoin(clean)) + '.</div>';
+        $('categories').innerHTML = html;
+      }
+
+      function listJoin(items) {
+        if (items.length < 2) return items.join('');
+        return items.slice(0, -1).join(', ') + (items.length > 2 ? ',' : '') + ' or ' + items[items.length - 1];
+      }
+
+      function eyeIcon() {
+        return '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5C6.5 5 2.7 9.4 1.5 12c1.2 2.6 5 7 10.5 7s9.3-4.4 10.5-7C21.3 9.4 17.5 5 12 5zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zm0-2.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>';
+      }
+
+      function renderPanel(c) {
+        var items = result.issues.filter(function (i) { return i.type === c.type; });
+        var limit = shown[c.type] || PAGE;
+        var html = '<div class="panel"><p class="help">' + esc(c.help) + '</p>';
+        items.slice(0, limit).forEach(function (issue) {
+          var idx = result.issues.indexOf(issue);
+          var body;
+          if (issue.before !== undefined) {
+            body = (issue.before ? '…' + esc(issue.before) : '') +
+              '<mark style="background:var(--' + c.type + ')">' + esc(issue.text) + '</mark>' +
+              (issue.after ? esc(issue.after) + '…' : '');
+          } else {
+            var t = issue.text.length > 140 ? issue.text.slice(0, 140) + '…' : issue.text;
+            body = '<mark style="background:var(--' + c.type + ')">' + esc(t) + '</mark>';
+          }
+          var meta = '';
+          if (issue.grade) meta = 'Grade ' + issue.grade + ' · ' + issue.words + ' words';
+          if (c.type === 'longParagraph') meta = issue.sentences + ' sentences · ' + issue.words + ' words';
+          html += '<div class="item"><button type="button" class="item-text" data-jump="' + idx + '" title="Select in document">' + body + '</button>';
+          if (meta) html += '<div class="item-meta">' + esc(meta) + '</div>';
+          var fixes = issue.suggestions || ((c.type === 'adverb') ? [''] : []);
+          if (fixes.length) {
+            html += '<div class="fixes">';
+            fixes.slice(0, 3).forEach(function (f, fi) {
+              html += '<button type="button" class="fix" data-fix="' + idx + '" data-fi="' + fi + '">' +
+                (f ? esc(f) : 'Delete') + '</button>';
+            });
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+        if (items.length > limit) {
+          html += '<button type="button" class="more" data-more="' + c.type + '">Show ' + Math.min(PAGE, items.length - limit) + ' more of ' + (items.length - limit) + '</button>';
+        }
+        return html + '</div>';
+      }
+
+      function renderScores() {
+        var sc = result.scores;
+        var rows = [
+          ['Flesch-Kincaid grade', fmt(sc.fleschKincaid, 1)],
+          ['Flesch reading ease', fmt(sc.readingEase, 1) + ' (' + easeLabel(sc.readingEase) + ')'],
+          ['Hemingway-style grade (ARI)', fmt(sc.ari, 1)],
+          ['Gunning Fog index', fmt(sc.gunningFog, 1)],
+          ['SMOG index', fmt(sc.smog, 1)],
+          ['Coleman-Liau index', fmt(sc.colemanLiau, 1)],
+          ['Average grade', fmt(sc.consensus, 1)]
+        ];
+        $('scores').innerHTML = rows.map(row).join('') +
+          '<p class="note">Grade scores estimate the US school grade needed to understand the text. Reading ease runs 0–100; higher is easier. Aim for 60 or more.</p>';
+      }
+
+      function easeLabel(e) {
+        if (e >= 90) return 'very easy';
+        if (e >= 80) return 'easy';
+        if (e >= 70) return 'fairly easy';
+        if (e >= 60) return 'plain English';
+        if (e >= 50) return 'fairly hard';
+        if (e >= 30) return 'hard';
+        return 'very hard';
+      }
+
+      function renderStats() {
+        var s = result.stats;
+        var passivePct = s.sentences ? Math.round((s.passiveSentences / s.sentences) * 100) : 0;
+        var rows = [
+          ['Words', s.words.toLocaleString()],
+          ['Sentences', s.sentences.toLocaleString()],
+          ['Paragraphs', s.paragraphs.toLocaleString()],
+          ['Characters', s.characters.toLocaleString()],
+          ['Characters (no spaces)', s.charactersNoSpaces.toLocaleString()],
+          ['Syllables', s.syllables.toLocaleString()],
+          ['Words per sentence', fmt(s.avgWordsPerSentence, 1)],
+          ['Sentences per paragraph', fmt(s.avgSentencesPerParagraph, 1)],
+          ['Syllables per word', fmt(s.avgSyllablesPerWord, 2)],
+          ['Letters per word', fmt(s.avgLettersPerWord, 1)],
+          ['Passive sentences', passivePct + '%'],
+          ['Reading time', readingTime(s.readingTimeMinutes)],
+          ['Speaking time', readingTime(s.speakingTimeMinutes)]
+        ];
+        $('stats').innerHTML = rows.map(row).join('');
+      }
+
+      function row(r) { return '<div class="row"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>'; }
+
+      // ---- Events -------------------------------------------------------
+
+      function setScope(scope) {
+        settings.scope = scope;
+        $('scope-document').setAttribute('aria-pressed', scope === 'document');
+        $('scope-selection').setAttribute('aria-pressed', scope === 'selection');
+      }
+
+      $('scope-document').onclick = function () { setScope('document'); save(); analyze(); };
+      $('scope-selection').onclick = function () { setScope('selection'); save(); analyze(); };
+      $('refresh').onclick = function () { analyze(); };
+
+      $('highlight').onchange = function () {
+        settings.highlight = this.checked;
+        $('highlight-note').hidden = !settings.highlight;
+        save();
+        if (settings.highlight) {
+          analyze();
+        } else {
+          setStatus('Clearing highlights…');
+          google.script.run
+            .withSuccessHandler(function () { setStatus('Highlights cleared.'); })
+            .withFailureHandler(function (err) { setStatus(err.message, true); })
+            .clearHighlights();
+        }
+      };
+
+      $('auto-refresh').onchange = function () { settings.autoRefresh = this.checked; save(); };
+      $('primary-score').onchange = function () { settings.primaryScore = this.value; save(); if (result) render(); };
+      $('target-grade').onchange = function () { settings.targetGrade = Number(this.value); save(); if (result) render(); };
+
+      $('categories').addEventListener('click', function (e) {
+        var btn = e.target.closest('button');
+        if (!btn || !result) return;
+        if (btn.dataset.cat) {
+          expanded[btn.dataset.cat] = !expanded[btn.dataset.cat];
+          renderCategories();
+          var again = document.querySelector('[data-cat="' + btn.dataset.cat + '"]');
+          if (again) again.focus();
+        } else if (btn.dataset.eye) {
+          var t = btn.dataset.eye;
+          settings.hidden = isHidden(t) ? settings.hidden.filter(function (x) { return x !== t; }) : settings.hidden.concat(t);
+          save();
+          renderCategories();
+          var eye = document.querySelector('[data-eye="' + t + '"]');
+          if (eye) eye.focus();
+          if (settings.highlight) analyze();
+        } else if (btn.dataset.jump) {
+          jumpTo(result.issues[Number(btn.dataset.jump)]);
+        } else if (btn.dataset.fix) {
+          var issue = result.issues[Number(btn.dataset.fix)];
+          var fixes = issue.suggestions || [''];
+          applyFix(issue, fixes[Number(btn.dataset.fi)]);
+        } else if (btn.dataset.more) {
+          shown[btn.dataset.more] = (shown[btn.dataset.more] || PAGE) + PAGE;
+          renderCategories();
+        }
+      });
+
+      // ---- Init ---------------------------------------------------------
+
+      (function init() {
+        var target = $('target-grade');
+        for (var g = 4; g <= 14; g++) {
+          var opt = document.createElement('option');
+          opt.value = g;
+          opt.textContent = 'Grade ' + g;
+          target.appendChild(opt);
+        }
+        target.value = settings.targetGrade;
+        $('primary-score').value = settings.primaryScore;
+        $('highlight').checked = !!settings.highlight;
+        $('highlight-note').hidden = !settings.highlight;
+        $('auto-refresh').checked = !!settings.autoRefresh;
+        setScope(settings.scope === 'selection' ? 'selection' : 'document');
+        analyze();
+        timer = setInterval(poll, 4000);
+      })();
     </script>
   </body>
 </html>

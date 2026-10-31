@@ -8,83 +8,67 @@ A Google Docs Add-on designed to calculate and display readability metrics (Fles
 
 ## Features
 
-- **Readability Scoring:** Automatically calculates:
-  - **Flesch-Kincaid Grade Level:** Indicates the US school grade level required to understand the text.
-  - **Flesch Reading Ease:** A score from 0-100 indicating how easy the document is to read.
-- **Traffic Light Indicators:** Visual readability status based on school grade level (Green/Good $\le$ 8.0, Orange/Fair $\le$ 10.0, Red/Difficult $>$ 10.0).
-- **Text Statistics:**
-  - **Counts:** Word count, character count, sentence count, paragraph count.
-  - **Averages:** Sentences per paragraph, words per sentence, characters per word.
-- **Passive Voice Detector:** Estimates the percentage of sentences using passive voice.
-- **Google Docs Integration:** Runs inside Google Docs using a native container sidebar.
+Everything the Hemingway Editor checks, inside Google Docs, plus more:
+
+- **Readability grade** with a target you choose (grade 4–14) and a Good / OK / Hard rating. Pick the headline formula: Flesch-Kincaid (default), Hemingway-style ARI, or the average of five formulas.
+- **All the major scores:** Flesch-Kincaid grade, Flesch reading ease, Automated Readability Index (the formula Hemingway uses), Gunning Fog, SMOG, Coleman-Liau, and their average.
+- **Hemingway-style suggestions:**
+  - Hard and very hard sentences (red and yellow)
+  - Words with simpler alternatives (purple), from the federal plain language word list
+  - Adverbs, passive voice, and qualifiers like "very", "just", and "I think"
+- **Extra plain language checks Hemingway does not do:** wordy phrases ("in order to" → "to", "due to the fact that" → "because"), repeated words ("the the"), and long paragraphs.
+- **Works in the document:**
+  - **Highlight in doc** colors issues right in the Google Doc. Each category can be shown or hidden. Highlights only use the add-on's own colors, so your highlights stay. Clear them from the sidebar or **Extensions → Flesch-Kincaid Readability → Clear Highlights**.
+  - Click any suggestion to select that text in the document.
+  - One-click fixes replace a word or delete a hedge. Deleting cleans up the extra space or comma and capitalizes the sentence again.
+  - **Selection** mode checks only the text you select.
+  - **Update as I type** re-checks the document a few seconds after it changes.
+- **Statistics:** words, sentences, paragraphs, characters, syllables, averages, passive sentence percentage, and reading and speaking time.
+
+### Compared with Hemingway
+
+These sample texts give the same grade, word count, sentence count, and hard and very hard sentence counts in both tools (see `tests/`):
+
+| Text | Hemingway | This add-on (ARI) |
+| --- | --- | --- |
+| Hemingway's own sample (`hemingway-sample.txt`) | Grade 8, 180 words, 13 sentences, 1 very hard, 1 hard | 7.7 → 8, 180, 13, 1, 1 |
+| Benefits memo (`test-memo.txt`) | Grade 10, 156 words, 11 sentences, 3 very hard, 1 hard | 10.4 → 10, 156, 11, 3, 1 |
+| Games paragraph (`games.txt`) | Grade 15, 82 words, 3 sentences, 2 very hard | 15.0 → 15, 82, 3, 2 |
+
+On the memo, the add-on also flags "cognizant", "disseminate", "utilizes", "approximately", "the majority of", and "the the". Hemingway's free editor misses all of these.
 
 ---
 
 ## Technical Architecture
 
-The project is structured as a Google Apps Script Container Add-on. It separates client-side presentation from server-side text processing.
+The project is a Google Apps Script editor add-on. Text analysis is pure JavaScript with no Apps Script calls, so it also runs in Node for tests.
 
-### Architecture Flow
+- **`src/TextAnalyzer.js`**: sentence splitting (handles abbreviations, initials, and decimals), syllable counting, readability formulas, and style checks. `analyzeParagraphs()` returns totals, scores, and a list of issues with paragraph offsets.
+- **`src/Code.js`**: menus and sidebar. It reads paragraphs (including tables and lists), analyzes the document or the selection, writes and clears highlights, selects issues, and applies fixes. Paragraphs are identified by their path of child indexes. Fixes check that the text is still there before changing it.
+- **`src/Sidebar.html`**: the sidebar UI. It calls the server with `google.script.run`. When "Update as I type" is on, it compares a cheap document fingerprint every 4 seconds and re-analyzes only when the text or selection changes.
 
-```mermaid
-graph TD
-    %% Styling
-    classDef client fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000;
-    classDef server fill:#efebe9,stroke:#5d4037,stroke-width:2px,color:#000;
-    classDef api fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000;
-
-    %% Nodes
-    subgraph Client [Client-Side: Google Docs UI]
-        A[Sidebar UI: Sidebar.html]:::client
-    end
-
-    subgraph Server [Server-Side: Google Apps Script Runtime]
-        B[Add-on Entry: Code.js]:::server
-        C[Core Logic: TextAnalyzer.js]:::server
-    end
-
-    subgraph GoogleDocsAPI [Google Workspace Environment]
-        D[Active Document]:::api
-    end
-
-    %% Interactions
-    A -->|1. Click 'Refresh' / Window Load| A
-    A -->|2. Invoke google.script.run.calculateStats| B
-    B -->|3. Call getReadabilityStats| C
-    C -->|4. Request text content| D
-    D -->|5. Return raw text body| C
-    C -->|6. Count syllables, words, sentences, paragraphs| C
-    C -->|7. Estimate passive voice sentences| C
-    C -->|8. Compute Flesch-Kincaid metrics| C
-    C -->|9. Return stats JSON payload| B
-    B -->|10. Callback returns data to Client| A
-    A -->|11. Re-render DOM & Traffic-Light| A
-```
-
-### Components Description
-1. **Frontend (`src/Sidebar.html`):** Renders the user interface inside the Google Docs sidebar container. It handles user interaction, executes async server-side calls, and dynamically updates the DOM and the traffic light indicator based on the returned scores.
-2. **Backend Entry (`src/Code.js`):** Contains the lifecycle hooks (`onOpen` and `onInstall`) to register the Add-on menu item in Google Docs, serves the sidebar template, and exposes server-side execution wrappers for client invocation.
-3. **Text Analyzer (`src/TextAnalyzer.js`):** Interacts with the `DocumentApp` service to read the active document text, runs text-processing algorithms (syllable counting, passive voice heuristic matching), and calculates the Flesch-Kincaid metrics.
+Settings (target grade, formula, highlight and auto-update choices) are saved per user with `PropertiesService`.
 
 ---
 
 ## How It Works & Calculations
 
-### Flesch Reading Ease Formula
-$$\text{Score} = 206.835 - 1.015 \left( \frac{\text{total words}}{\text{total sentences}} \right) - 84.6 \left( \frac{\text{total syllables}}{\text{total words}} \right)$$
+- **Words** are runs of letters and numbers. Contractions and hyphenated words count as one word.
+- **Sentences** end at `.`, `!`, `?`, or the end of a paragraph, so headings and list items without periods count as sentences. Abbreviations such as "Dr.", "Jan.", "U.S.", and "e.g." do not end a sentence.
+- **Syllables** use vowel-group rules with fixes for silent endings, plus an exception list. They match the CMU Pronouncing Dictionary for 97% of the 5,000 most common English words. The earlier counter matched 90%.
 
-- **90–100:** Very Easy (5th-grade level)
-- **80–90:** Easy (6th-grade level)
-- **70–80:** Fairly Easy (7th-grade level)
-- **60–70:** Standard (8th to 9th-grade level)
-- **50–60:** Fairly Difficult (10th to 12th-grade level)
-- **30–50:** Difficult (College level)
-- **0–30:** Very Difficult (College graduate level)
+| Score | Formula |
+| --- | --- |
+| Flesch-Kincaid grade | 0.39 × (words / sentences) + 11.8 × (syllables / words) − 15.59 |
+| Flesch reading ease | 206.835 − 1.015 × (words / sentences) − 84.6 × (syllables / words) |
+| ARI (Hemingway-style) | 4.71 × (letters / words) + 0.5 × (words / sentences) − 21.43 |
+| Gunning Fog | 0.4 × (words / sentences + 100 × complex words / words) |
+| SMOG | 1.043 × √(polysyllables × 30 / sentences) + 3.1291 |
+| Coleman-Liau | 0.0588 × letters per 100 words − 0.296 × sentences per 100 words − 15.8 |
 
-### Flesch-Kincaid Grade Level Formula
-$$\text{Grade Level} = 0.39 \left( \frac{\text{total words}}{\text{total sentences}} \right) + 11.8 \left( \frac{\text{total syllables}}{\text{total words}} \right) - 15.59$$
+**Hard sentences** follow Hemingway: a sentence of 14 or more words is *hard* when its own ARI grade rounds to 10–13 and *very hard* at 14 or more. Headings are skipped.
 
-- Reflects the equivalent US school grade level (e.g., a score of 8.0 indicates the text is readable by an average 8th grader).
+Reading ease guide: 90–100 very easy, 80–90 easy, 70–80 fairly easy, 60–70 plain English, 50–60 fairly hard, 30–50 hard, 0–30 very hard.
 
 ---
 
@@ -98,6 +82,15 @@ $$\text{Grade Level} = 0.39 \left( \frac{\text{total words}}{\text{total sentenc
 │   ├── TextAnalyzer.js  # Text parsing, syllable counts, & readability logic
 │   ├── Sidebar.html     # User interface (HTML, CSS styling, client-side JS)
 │   └── appsscript.json  # Add-on configuration manifest (scopes, runtime)
+└── tests/
+    ├── analyzer.test.js # Node tests for TextAnalyzer.js
+    └── *.txt            # Sample texts compared against Hemingway
+```
+
+Run the tests with Node 18 or later:
+
+```bash
+node --test tests/analyzer.test.js
 ```
 
 ---
@@ -156,20 +149,20 @@ clasp create --title "Google Docs Flesch-Kincaid" --type docs
 
 The add-on declares the following scopes in `src/appsscript.json`:
 
-- `https://www.googleapis.com/auth/documents.currentonly`: Grants access to read and edit the document the user is currently working on. Used to analyze the document's text.
+- `https://www.googleapis.com/auth/documents.currentonly`: Grants access to read and edit the document the user is currently working on. Used to analyze the text, and to add highlights or apply fixes when you ask.
 - `https://www.googleapis.com/auth/script.container.ui`: Allows the script to create and show the sidebar user interface within Google Docs.
 
 ---
 
 ## Installing & Usage
 
-The add-on is published privately to the maryland.gov domain on the Google Workspace Marketplace. In any Google Doc, open **Extensions → Add-ons → Get add-ons**, search for "Flesch-Kincaid Readability", and click **Install**. Then open **Extensions → Flesch-Kincaid Readability → Show Sidebar**, and click **Refresh Statistics** after editing.
+The add-on is published privately to the maryland.gov domain on the Google Workspace Marketplace. In any Google Doc, open **Extensions → Add-ons → Get add-ons**, search for "Flesch-Kincaid Readability", and click **Install**. Then open **Extensions → Flesch-Kincaid Readability → Show Sidebar**. The sidebar updates as you type. Turn on **Highlight in doc** to see issues in the document.
 
 ---
 
 ## Privacy
 
-The add-on requests access only to the document you have open and permission to show a sidebar (see the scopes above). It reads the document text only when you open the sidebar or click Refresh. The text is analyzed within Google Apps Script and is not stored, logged, or sent to any third party.
+The add-on requests access only to the document you have open and permission to show a sidebar (see the scopes above). It reads the document text only while the sidebar is open. It changes the document only when you turn on highlights or click a fix. The text is analyzed within Google Apps Script and is not stored, logged, or sent to any third party. Your sidebar settings are saved to your Google account.
 
 ---
 

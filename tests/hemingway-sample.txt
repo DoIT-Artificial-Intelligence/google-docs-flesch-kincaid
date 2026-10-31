@@ -1,0 +1,6 @@
+Hemingway App makes your writing concise and correct.
+The app highlights lengthy, complex sentences and common errors; if you see a yellow sentence, shorten or split it. If you see a red highlight, your sentence is so dense and complicated that your readers will get lost trying to follow its meandering, convoluted logic—try editing this sentence to remove the red highlight.
+You can utilize a simpler word instead of a purple one. Click on highlights to fix them.
+Adverbs, passive voice, and other weakening phrases are marked in blue. I believe you should replace them with more forceful language.
+Hemingway Editor Plus uses AI to fix these highlights for you. It also marks writing issues in green, including grammar, clarity, and consistency. Use a style guide to choose which issues it checks. You can also change the tone or style of your writing by selecting text and using the "AI tools" button at the top.
+To get started, paste in something you're working on and edit away. Or, click the Write button to hide highlights and compose something new.

@@ -107,7 +107,8 @@
       .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
       .row span:first-child { color: var(--muted); }
       .row b { font-weight: 600; }
-      .footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+      .footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; font-size: 12px; color: var(--muted); }
+      .footer #updated { font-size: 11px; white-space: nowrap; }
       .status { font-size: 11px; color: var(--muted); min-height: 16px; margin-top: 6px; }
       .status.error { color: var(--bad); }
       .notice { background: #fff8e1; border: 1px solid #f9e1a0; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin-bottom: 10px; }
@@ -209,10 +210,8 @@
 
     <div class="footer">
       <label class="switch"><input type="checkbox" id="auto-refresh"> Update as I type</label>
-      <span class="footer-actions">
-        <button type="button" class="link-btn" id="copy-summary" title="Copy scores and suggestions to paste into an email or review">Copy summary</button>
-        <span id="updated"></span>
-      </span>
+      <span id="updated"></span>
+      <button type="button" class="link-btn" id="copy-summary" style="margin-left:0;padding-left:0" title="Copy scores and suggestions to paste into an email or review">Copy summary</button>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
 
@@ -375,7 +374,10 @@
           ? '<span class="ai-ok">✓ Meaning kept</span>'
           : '<span class="ai-warn">⚠ Check the meaning:</span><ul>' +
             d.changes.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>';
-        return '<div class="ai-box"><div class="ai-text">' + esc(d.rewrite) + '</div>' +
+        var from = key === 'selection'
+          ? '<div class="ai-meta">Rewrites: “' + esc(d.ref.text.length > 120 ? d.ref.text.slice(0, 120) + '…' : d.ref.text) + '”</div>'
+          : '';
+        return '<div class="ai-box">' + from + '<div class="ai-text">' + esc(d.rewrite) + '</div>' +
           '<div class="ai-meta"><span class="badge ' + gradeCls + '">Grade ' + Math.max(0, Math.round(d.grade)) + '</span> ' + meaning + '</div>' +
           '<div class="fixes"><button type="button" class="fix accept" data-ai-accept="' + k + '">Accept</button>' +
           '<button type="button" class="fix" data-ai-retry="' + k + '">Try again</button>' +

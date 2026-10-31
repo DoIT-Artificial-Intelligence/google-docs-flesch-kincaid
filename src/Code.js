@@ -555,8 +555,18 @@ function selectionRef() {
   if (!windows) throw new Error('Select the text you want to rewrite first.');
   if (windows.length > 1) throw new Error('Select text within one paragraph to rewrite it.');
   const w = windows[0];
-  const text = w.record.text.slice(w.start, w.end);
-  if (!text.trim()) throw new Error('Select the text you want to rewrite first.');
+  if (!w.record.text.slice(w.start, w.end).trim()) throw new Error('Select the text you want to rewrite first.');
+  // Rewrite whole sentences, so a selection that starts or ends mid-sentence
+  // does not leave a broken sentence behind.
+  let start = w.start;
+  let end = w.end;
+  splitSentences(w.record.text).forEach(s => {
+    if (s.start < w.end && s.end > w.start) {
+      start = Math.min(start, s.start);
+      end = Math.max(end, s.end);
+    }
+  });
+  const text = w.record.text.slice(start, end);
   if (text.length > 2000) throw new Error('Select a shorter passage (under 2,000 characters) to rewrite.');
-  return { path: w.record.path, start: w.start, end: w.end, text };
+  return { path: w.record.path, start, end, text };
 }

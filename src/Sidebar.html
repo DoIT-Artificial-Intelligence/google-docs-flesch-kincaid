@@ -316,11 +316,11 @@
           replacement ? 'Replaced with "' + replacement + '".' : 'Deleted "' + issue.text + '".');
       }
 
-      function replaceRef(ref, replacement, doneMessage) {
+      function replaceRef(ref, replacement, doneMessage, onDone) {
         setStatus('Replacing…');
         busy = true;
         google.script.run
-          .withSuccessHandler(function () { busy = false; analyze(true, doneMessage); })
+          .withSuccessHandler(function () { busy = false; if (onDone) onDone(); analyze(true, doneMessage); })
           .withFailureHandler(function (err) { busy = false; setStatus(err.message, true); })
           .replaceIssue(ref, replacement);
       }
@@ -391,7 +391,9 @@
         if (btn.dataset.aiAccept) {
           delete ai[key];
           redrawAi(key);
-          replaceRef(st.ref, st.data.rewrite, 'Rewrite applied.');
+          replaceRef(st.ref, st.data.rewrite, 'Rewrite applied.', function () {
+            google.script.run.logRewriteAccepted(st.data.id);
+          });
         } else if (btn.dataset.aiRetry) {
           startRewrite(key, key === 'selection' ? null : st.ref);
         } else {

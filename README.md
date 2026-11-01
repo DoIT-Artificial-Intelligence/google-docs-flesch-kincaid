@@ -161,7 +161,8 @@ The add-on declares the following scopes in `src/appsscript.json`:
 
 - `https://www.googleapis.com/auth/documents.currentonly`: Grants access to read and edit the document the user is currently working on. Used to analyze the text, and to add highlights or apply fixes when you ask.
 - `https://www.googleapis.com/auth/script.container.ui`: Allows the script to create and show the sidebar user interface within Google Docs.
-- `https://www.googleapis.com/auth/script.external_request`: Lets the add-on call the Gemini API for AI rewrites. Requests can only go to `generativelanguage.googleapis.com` (see `urlFetchWhitelist` in the manifest).
+- `https://www.googleapis.com/auth/script.external_request`: Lets the add-on call the Gemini API for AI rewrites. Requests can only go to `generativelanguage.googleapis.com`, plus `oauth2.googleapis.com` and `bigquery.googleapis.com` for usage logging (see `urlFetchWhitelist` in the manifest).
+- `https://www.googleapis.com/auth/userinfo.email`: Lets the add-on read your email address, so AI rewrite usage logs show who made each request.
 
 ---
 
@@ -178,13 +179,26 @@ The add-on can only open the document you have open (see the scopes above).
 - **Reading:** it reads the document text only while the sidebar is open. Readability scores and suggestions are worked out inside Google Apps Script.
 - **Changes:** it changes your document only when you turn on highlights, click a fix, or accept an AI rewrite.
 - **AI rewrites:** when you click **✨ Rewrite** or **Rewrite selection**, the add-on sends only that sentence or selection to Google's Gemini API to write a plain language version and check its meaning. Nothing is sent unless you click. The add-on uses the paid Gemini API, and Google does not use paid API data to train its models.
-- **Storage:** the add-on does not store or log your document text. Your sidebar settings and daily rewrite count are saved to your Google account. Suggestions you ignore are saved with the document.
+- **Usage logs:** each AI rewrite is logged to a BigQuery table run by Maryland DoIT. The log holds your email address, the time, the sentence you sent, the rewrite, whether you accepted it, and its token count and cost. We use it to track usage and cost. Nothing is logged for readability checks or other fixes.
+- **Storage:** apart from the rewrite log, the add-on does not store your document text. Your sidebar settings and daily rewrite count are saved to your Google account. Suggestions you ignore are saved with the document.
 
 ---
 
 ## Support
 
 Report problems or request features via [GitHub Issues](https://github.com/DoIT-Artificial-Intelligence/google-docs-flesch-kincaid/issues).
+
+---
+
+## Usage logging
+
+Each AI rewrite streams a row into BigQuery `adept-figure-493916-r5.docs_addon_usage.rewrite_events`. Accepting a rewrite adds a second `accept` row. The view `docs_addon_usage.rewrites` joins these into one row per rewrite with the columns `user, time, sentence, rewrite, accepted, tokens, cost`. You can open it in Google Sheets with **Data → Data connectors → Connect to BigQuery**. Cost is worked out when the row is logged, from `GEMINI_PRICE_PER_M` in `src/Code.js`. Update that constant if the model or its price changes.
+
+The dataset, table, view, and the `docs-addon-logger` service account are managed in Terraform under `infra/`. The service account can only write to this dataset. Its JSON key is not in Terraform, so the private key never lands in state. The key goes in the Apps Script **script property** `BQ_SERVICE_ACCOUNT_KEY`. If the property is missing or logging fails, rewrites still work, and the error goes to the Apps Script log.
+
+```bash
+cd infra && terraform init && terraform plan   # state is local (gitignored)
+```
 
 ---
 

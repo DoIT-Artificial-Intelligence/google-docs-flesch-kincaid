@@ -1,0 +1,19 @@
+[
+ {"name":"event_id","type":"STRING","mode":"REQUIRED","description":"Unique id for this event row"},
+ {"name":"rewrite_id","type":"STRING","mode":"REQUIRED","description":"Links an accept event to its rewrite event"},
+ {"name":"event","type":"STRING","mode":"REQUIRED","description":"rewrite | accept"},
+ {"name":"time","type":"TIMESTAMP","mode":"REQUIRED"},
+ {"name":"user","type":"STRING","description":"User email when available"},
+ {"name":"user_key","type":"STRING","description":"Session.getTemporaryActiveUserKey() (anonymous, rotates ~30 days)"},
+ {"name":"sentence","type":"STRING"},
+ {"name":"rewrite","type":"STRING"},
+ {"name":"target_grade","type":"INTEGER"},
+ {"name":"rewrite_grade","type":"FLOAT"},
+ {"name":"same_meaning","type":"BOOLEAN"},
+ {"name":"gemini_calls","type":"INTEGER"},
+ {"name":"input_tokens","type":"INTEGER"},
+ {"name":"output_tokens","type":"INTEGER","description":"Candidates + thinking tokens"},
+ {"name":"tokens","type":"INTEGER"},
+ {"name":"cost","type":"FLOAT","description":"USD, at prices in effect when logged"},
+ {"name":"model","type":"STRING"}
+]

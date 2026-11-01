@@ -28,7 +28,7 @@
 >
 > Plain language makes public information easier for everyone to understand. Aim for grade 8 or lower for general audiences.
 >
-> Privacy: the add-on only reads the document you have open, and only while the sidebar is open. It changes your document only when you turn on highlights, click a fix, or accept a rewrite. Scores and suggestions are worked out in Apps Script. When you click Rewrite, only that sentence or selection is sent to Google's Gemini API (paid tier, not used to train models). The add-on does not store your text.
+> Privacy: the add-on only reads the document you have open, and only while the sidebar is open. It changes your document only when you turn on highlights, click a fix, or accept a rewrite. Scores and suggestions are worked out in Apps Script. When you click Rewrite, only that sentence or selection is sent to Google's Gemini API (paid tier, not used to train models). Each AI rewrite is logged (your email, the sentence, the rewrite, whether you accepted it, and its cost) so Maryland DoIT can track usage. The add-on does not store any other text.
 
 **Graphics:**
 

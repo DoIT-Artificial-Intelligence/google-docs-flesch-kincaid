@@ -401,9 +401,14 @@ function replaceIssue(issue, replacement) {
   const pieces = piecesFor(loc.record, start, end);
   if (!pieces.length) throw new Error('Could not find that text.');
   const first = pieces[0];
+  // Inserted text takes the formatting of the character before it, or the
+  // paragraph style at the start of a paragraph. Copy the formatting of the
+  // text being replaced instead, so a bold 23pt heading stays bold and 23pt.
+  const attrs = replacement ? textAttributes_(first.el, first.start) : null;
   for (let i = pieces.length - 1; i >= 0; i--) pieces[i].el.deleteText(pieces[i].start, pieces[i].end);
   if (replacement) {
     first.el.insertText(first.start, replacement);
+    if (attrs) first.el.setAttributes(first.start, first.start + replacement.length - 1, attrs);
   } else if (atSentenceStart) {
     const rest = first.el.getText();
     const ch = rest.charAt(first.start);
@@ -413,6 +418,24 @@ function replaceIssue(issue, replacement) {
     }
   }
   return true;
+}
+
+/**
+ * The character formatting set at one offset, without unset (null) values or
+ * the add-on's own highlight colors.
+ */
+function textAttributes_(textEl, offset) {
+  const all = textEl.getAttributes(offset);
+  const out = {};
+  let any = false;
+  Object.keys(all).forEach(k => {
+    const v = all[k];
+    if (v === null || v === undefined) return;
+    if (k === String(DocumentApp.Attribute.BACKGROUND_COLOR) && OUR_COLORS.has(String(v).toLowerCase())) return;
+    out[k] = v;
+    any = true;
+  });
+  return any ? out : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +466,9 @@ function resetIgnored() {
 
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const AI_DAILY_LIMIT = 300;
+// Paid-tier USD per 1M tokens for GEMINI_MODEL (thinking tokens bill as output).
+// Update these if the model or its pricing changes.
+const GEMINI_PRICE_PER_M = { input: 0.30, output: 2.50 };
 
 /**
  * Rewrites text in plain language with Gemini, re-scores the result, retries
@@ -457,21 +483,22 @@ function aiRewrite(ref, targetGrade) {
   if (!ref) ref = selectionRef();
   const target = Math.max(4, Math.min(14, Number(targetGrade) || 8));
   countAiUse();
+  const usage = { calls: 0, input: 0, output: 0 };
 
-  let rewrite = geminiJson(rewritePrompt(ref.text, target, ''), {
+  let rewrite = geminiJson_(rewritePrompt(ref.text, target, ''), {
     type: 'OBJECT', properties: { rewrite: { type: 'STRING' } }, required: ['rewrite']
-  }).rewrite.trim();
+  }, usage).rewrite.trim();
   let check = scoreText(rewrite);
   if (check.hard || check.grade > target + 1) {
     const feedback = 'Your last attempt was still at grade ' + Math.round(check.grade) +
       '. Use shorter sentences and simpler words.\nLast attempt: ' + rewrite;
-    rewrite = geminiJson(rewritePrompt(ref.text, target, feedback), {
+    rewrite = geminiJson_(rewritePrompt(ref.text, target, feedback), {
       type: 'OBJECT', properties: { rewrite: { type: 'STRING' } }, required: ['rewrite']
-    }).rewrite.trim();
+    }, usage).rewrite.trim();
     check = scoreText(rewrite);
   }
 
-  const meaning = geminiJson(
+  const meaning = geminiJson_(
     'Compare the ORIGINAL text and its plain language REWRITE.\n' +
     'List every fact, number, name, date, condition, or requirement that the rewrite adds, removes, or changes. ' +
     'Also list it if a requirement became optional or a request (for example "must" became "please"). ' +
@@ -482,15 +509,32 @@ function aiRewrite(ref, targetGrade) {
       type: 'OBJECT',
       properties: { sameMeaning: { type: 'BOOLEAN' }, changes: { type: 'ARRAY', items: { type: 'STRING' } } },
       required: ['sameMeaning', 'changes']
-    });
+    }, usage);
 
-  return {
-    ref,
+  const sameMeaning = !!meaning.sameMeaning && !(meaning.changes || []).length;
+  const id = Utilities.getUuid();
+  logUsage_({
+    rewrite_id: id,
+    event: 'rewrite',
+    sentence: ref.text,
     rewrite,
-    grade: check.grade,
-    sameMeaning: !!meaning.sameMeaning && !(meaning.changes || []).length,
-    changes: meaning.changes || []
-  };
+    target_grade: target,
+    rewrite_grade: check.grade,
+    same_meaning: sameMeaning,
+    gemini_calls: usage.calls,
+    input_tokens: usage.input,
+    output_tokens: usage.output,
+    tokens: usage.input + usage.output,
+    cost: (usage.input * GEMINI_PRICE_PER_M.input + usage.output * GEMINI_PRICE_PER_M.output) / 1e6,
+    model: GEMINI_MODEL
+  });
+
+  return { id, ref, rewrite, grade: check.grade, sameMeaning, changes: meaning.changes || [] };
+}
+
+/** Called by the sidebar after the user accepts a rewrite. */
+function logRewriteAccepted(id) {
+  if (id) logUsage_({ rewrite_id: String(id), event: 'accept' });
 }
 
 function rewritePrompt(text, target, feedback) {
@@ -514,7 +558,7 @@ function scoreText(text) {
   return { grade: r.scores.fleschKincaid, hard: r.counts.hard + r.counts.veryHard > 0 };
 }
 
-function geminiJson(prompt, schema) {
+function geminiJson_(prompt, schema, usage) {
   const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   if (!key) throw new Error('AI rewrites are not set up yet. Ask your administrator to add GEMINI_API_KEY.');
   const response = UrlFetchApp.fetch(
@@ -533,6 +577,12 @@ function geminiJson(prompt, schema) {
     throw new Error('The AI service is busy or unavailable. Try again in a minute.');
   }
   const body = JSON.parse(response.getContentText());
+  if (usage) {
+    const u = body.usageMetadata || {};
+    usage.calls += 1;
+    usage.input += u.promptTokenCount || 0;
+    usage.output += (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0);
+  }
   const part = body.candidates && body.candidates[0] && body.candidates[0].content &&
     body.candidates[0].content.parts && body.candidates[0].content.parts[0];
   if (!part) throw new Error('The AI service did not return a rewrite. Try again.');
@@ -569,4 +619,93 @@ function selectionRef() {
   const text = w.record.text.slice(start, end);
   if (text.length > 2000) throw new Error('Select a shorter passage (under 2,000 characters) to rewrite.');
   return { path: w.record.path, start, end, text };
+}
+
+// ---------------------------------------------------------------------------
+// Usage logging (BigQuery)
+// ---------------------------------------------------------------------------
+
+// Rows go to a raw event table; the `rewrites` view in the same dataset
+// joins rewrite and accept events into one row per rewrite.
+const BQ_PROJECT = 'adept-figure-493916-r5';
+const BQ_DATASET = 'docs_addon_usage';
+const BQ_TABLE = 'rewrite_events';
+
+/**
+ * Streams one event row to BigQuery as the logging service account, whose key
+ * is in the script property BQ_SERVICE_ACCOUNT_KEY. Logging never breaks the
+ * add-on: if it is not set up or fails, the error is only written to the log.
+ */
+function logUsage_(row) {
+  try {
+    const token = bigQueryToken_();
+    if (!token) return;
+    let email = '';
+    try { email = Session.getActiveUser().getEmail(); } catch (e) { /* no email scope */ }
+    const eventId = Utilities.getUuid();
+    const full = Object.assign({
+      event_id: eventId,
+      time: new Date().toISOString(),
+      user: email || null,
+      user_key: Session.getTemporaryActiveUserKey() || null
+    }, row);
+    const response = UrlFetchApp.fetch(
+      'https://bigquery.googleapis.com/bigquery/v2/projects/' + BQ_PROJECT + '/datasets/' + BQ_DATASET +
+        '/tables/' + BQ_TABLE + '/insertAll', {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + token },
+        muteHttpExceptions: true,
+        payload: JSON.stringify({ rows: [{ insertId: eventId, json: full }] })
+      });
+    const body = response.getContentText();
+    if (response.getResponseCode() !== 200 || /insertErrors/.test(body)) {
+      console.error('BigQuery log failed ' + response.getResponseCode() + ': ' + body.slice(0, 500));
+    }
+  } catch (e) {
+    console.error('BigQuery log failed: ' + e);
+  }
+}
+
+/** An OAuth token for the logging service account, cached for 50 minutes. */
+function bigQueryToken_() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('bqToken');
+  if (cached) return cached;
+  const raw = PropertiesService.getScriptProperties().getProperty('BQ_SERVICE_ACCOUNT_KEY');
+  if (!raw) return null;
+  const key = JSON.parse(raw);
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = obj => Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, '');
+  const unsigned = b64({ alg: 'RS256', typ: 'JWT' }) + '.' + b64({
+    iss: key.client_email,
+    scope: 'https://www.googleapis.com/auth/bigquery.insertdata',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600
+  });
+  const sig = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(unsigned, key.private_key)).replace(/=+$/, '');
+  const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    muteHttpExceptions: true,
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: unsigned + '.' + sig }
+  });
+  if (response.getResponseCode() !== 200) {
+    console.error('Service account token failed: ' + response.getContentText().slice(0, 300));
+    return null;
+  }
+  const token = JSON.parse(response.getContentText()).access_token;
+  cache.put('bqToken', token, 3000);
+  return token;
+}
+
+/**
+ * Run from the Apps Script editor to check the logging key. Returns only
+ * whether a token could be minted, never the token itself.
+ */
+function checkUsageLogging() {
+  CacheService.getScriptCache().remove('bqToken');
+  const ok = !!bigQueryToken_();
+  console.log(ok ? 'BigQuery logging is set up.' : 'BigQuery logging is NOT set up; see the log above.');
+  return ok;
 }

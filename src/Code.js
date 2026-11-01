@@ -4,19 +4,25 @@
  * Text analysis itself lives in TextAnalyzer.js.
  */
 
-/** Background colors used for in-document highlights, by issue type. */
+/**
+ * Background colors used for in-document highlights, by issue type. Chosen to
+ * differ in lightness as well as hue, so they stay distinguishable with color
+ * blindness, while keeping black text at 9:1 contrast or better.
+ */
 const HIGHLIGHT_COLORS = {
-  veryHard: '#f6c4c3',
-  hard: '#fbecb4',
-  simpler: '#e3cff8',
-  wordy: '#e3cff8',
-  adverb: '#c5e2fa',
-  qualifier: '#c5e2fa',
-  passive: '#cbedc9',
-  repeated: '#fbd5b3',
-  acronym: '#f9d0e6'
+  veryHard: '#f59f9a',
+  hard: '#ffe680',
+  simpler: '#b99af2',
+  wordy: '#b99af2',
+  adverb: '#a8e0ff',
+  qualifier: '#a8e0ff',
+  passive: '#b7ebb0',
+  repeated: '#ffc27a',
+  acronym: '#e3e3e3'
 };
-const OUR_COLORS = new Set(Object.values(HIGHLIGHT_COLORS));
+/** Colors from earlier versions, so their highlights are still cleared. */
+const LEGACY_COLORS = ['#f6c4c3', '#fbecb4', '#e3cff8', '#c5e2fa', '#cbedc9', '#fbd5b3', '#f9d0e6'];
+const OUR_COLORS = new Set(Object.values(HIGHLIGHT_COLORS).concat(LEGACY_COLORS));
 /** Each highlight is a few document calls, so very long documents are capped. */
 const MAX_HIGHLIGHTS = 1000;
 

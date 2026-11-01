@@ -71,6 +71,21 @@
       .quick b { display: block; font-size: 15px; }
       .quick small { color: var(--muted); font-size: 11px; }
 
+      /* Color key for in-document highlights. Sticky so it stays visible while the sidebar scrolls. */
+      .legend {
+        position: sticky; top: 0; z-index: 5; margin: 0 -12px 10px; padding: 6px 12px 7px;
+        background: var(--bg); border-bottom: 1px solid var(--line);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, .04);
+      }
+      .legend-title { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+      .legend-items { display: flex; flex-wrap: wrap; gap: 3px 10px; }
+      .legend-items button {
+        display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 1px 0;
+        font-size: 12px; cursor: pointer; text-align: left;
+      }
+      .legend-items button:hover span:last-child { text-decoration: underline; }
+      .legend-dot { width: 14px; min-width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, .18); }
+      .cat-toggle { scroll-margin-top: 72px; }
       .issues-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
       .issues-head h2 { margin: 0; }
       .switch { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
@@ -147,6 +162,11 @@
         <button type="button" id="scope-selection" aria-pressed="false">Selection</button>
       </div>
       <button type="button" class="icon-btn" id="refresh" title="Re-analyze now">Refresh</button>
+    </div>
+
+    <div id="legend" class="legend" role="group" aria-labelledby="legend-title" hidden>
+      <div class="legend-title" id="legend-title">Highlight colors</div>
+      <div class="legend-items" id="legend-items"></div>
     </div>
 
     <div id="notice" class="notice" hidden></div>
@@ -242,6 +262,16 @@
           help: 'The same word twice in a row is usually a typo.' },
         { type: 'longParagraph', name: 'long paragraph', label: function (n) { return n + ' long paragraph' + (n === 1 ? '' : 's'); },
           help: 'Paragraphs with more than 5 sentences or 150 words are hard to scan. Break them up.', noHighlight: true }
+      ];
+      /** One legend entry per highlight color; some colors cover two issue types. */
+      var LEGEND = [
+        { types: ['veryHard'], names: { veryHard: 'Very hard sentence' } },
+        { types: ['hard'], names: { hard: 'Hard sentence' } },
+        { types: ['simpler', 'wordy'], names: { simpler: 'Simpler word', wordy: 'Wordy phrase' } },
+        { types: ['passive'], names: { passive: 'Passive voice' } },
+        { types: ['adverb', 'qualifier'], names: { adverb: 'Adverb', qualifier: 'Qualifier' } },
+        { types: ['repeated'], names: { repeated: 'Repeated word' } },
+        { types: ['acronym'], names: { acronym: 'Acronym to spell out' } }
       ];
       var PAGE = 25;
       /** Issue types that can be rewritten with AI (the whole sentence is sent). */
@@ -482,6 +512,23 @@
         return Math.round(min) + ' min';
       }
 
+      /** Shows a key for the colors currently highlighted in the document. */
+      function renderLegend() {
+        var items = [];
+        if (settings.highlight && result) {
+          LEGEND.forEach(function (g) {
+            var present = g.types.filter(function (t) { return (result.counts[t] || 0) > 0 && !isHidden(t); });
+            if (!present.length) return;
+            var label = present.map(function (t) { return g.names[t]; }).join(' / ');
+            items.push('<button type="button" data-legend="' + present[0] + '" title="Show these suggestions">' +
+              '<span class="legend-dot" style="background:var(--' + g.types[0] + ')" aria-hidden="true"></span>' +
+              '<span>' + esc(label) + '</span></button>');
+          });
+        }
+        $('legend').hidden = !items.length;
+        $('legend-items').innerHTML = items.join('');
+      }
+
       function renderCategories() {
         var s = result.stats;
         var html = '';
@@ -511,6 +558,7 @@
         if (!total && s.words) html = '<div class="empty">No suggestions. Nice work.</div>';
         else if (clean.length && s.words) html += '<div class="clean"><b>✓</b> No ' + esc(listJoin(clean)) + '.</div>';
         $('categories').innerHTML = html;
+        renderLegend();
       }
 
       function listJoin(items) {
@@ -631,6 +679,7 @@
 
       $('highlight').onchange = function () {
         settings.highlight = this.checked;
+        renderLegend();
         $('highlight-note').hidden = !settings.highlight;
         save();
         if (settings.highlight) {
@@ -647,6 +696,16 @@
       $('auto-refresh').onchange = function () { settings.autoRefresh = this.checked; save(); };
       $('primary-score').onchange = function () { settings.primaryScore = this.value; save(); if (result) render(); };
       $('target-grade').onchange = function () { settings.targetGrade = Number(this.value); save(); if (result) render(); };
+
+      $('legend-items').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-legend]');
+        if (!btn || !result) return;
+        var t = btn.dataset.legend;
+        expanded[t] = true;
+        renderCategories();
+        var row = document.querySelector('[data-cat="' + t + '"]');
+        if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'start' }); row.focus({ preventScroll: true }); }
+      });
 
       $('categories').addEventListener('click', function (e) {
         var btn = e.target.closest('button');
